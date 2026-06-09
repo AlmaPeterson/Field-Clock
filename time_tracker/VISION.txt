@@ -1,0 +1,297 @@
+# FieldClock — App Vision & Development Plan
+> A photo-first time tracking app built for construction workers and tradespeople.
+
+---
+
+## The Problem
+
+Construction workers lose money and credibility because time tracking is painful.
+Handwritten logs get lost. Memory is unreliable. Managers can't verify hours.
+There's no easy way to prove what you did, when you did it, and how long it took.
+
+## The Solution
+
+FieldClock turns your phone camera into a time clock and work journal.
+Every task starts and ends with a photo. The app does the math.
+At the end of the day, you send your manager a clean, verified summary —
+with timestamps, locations, photos, and total hours. No paperwork. No disputes.
+
+---
+
+## Core Principles
+
+- **Offline-first** — Works on job sites with no signal. Syncs when connected.
+- **Photo-verified** — Every time entry is backed by a real image with a timestamp.
+- **One-handed simplicity** — Designed for workers with dirty gloves. Big buttons, minimal taps.
+- **Manager-ready output** — Summaries are formatted for approval, not just personal reference.
+- **No data loss** — Time records are too important to lose. Everything is backed up.
+
+---
+
+## Who Uses This App
+
+### Primary User — The Worker (You)
+- Construction worker, tradesperson, or contractor
+- Works on multiple tasks per day across one or more job sites
+- Needs to prove hours worked to a manager or client
+- Often has dirty hands, poor lighting, and no signal on site
+- Values speed and simplicity over features
+
+### Secondary User — The Manager
+- Receives daily summaries via share (WhatsApp, email, SMS, etc.)
+- Needs to approve or dispute hours
+- Wants photo evidence alongside time records
+- Does not need to install the app
+
+---
+
+## Feature Plan
+
+### Phase 1 — MVP (Build First)
+
+| Feature | Description |
+|---|---|
+| Clock In / Clock Out | Photo taken at start and end of workday. Timestamp locked automatically. |
+| Task Tracking | Take a "before" photo to start a task, "after" photo to end it. |
+| Auto Time Calculation | Time per task calculated automatically, rounded to nearest 15 minutes. |
+| Task Naming | Name each task after completing it (e.g. "Framing — Master Bedroom"). |
+| Time Editing | Manually adjust start/end time if you forgot to log something. |
+| Daily Summary Screen | Clean overview: clock in/out, list of tasks, total hours for the day. |
+| Share Daily Summary | Send full day summary (with or without photos) via any share method. |
+| Share Single Task | Share one specific task with its photos and time. |
+
+### Phase 2 — Core Value Add
+
+| Feature | Description |
+|---|---|
+| GPS Location per Task | Auto-tag each task with location. Shown in summary and on share. |
+| Job / Project Grouping | Assign tasks and days to a named job (e.g. "123 Oak Street Renovation"). |
+| Task Notes | Short text field per task — materials used, issues found, measurements. |
+| Multiple Photos per Task | Before, during, and after photos per task. |
+| History & Archive | Browse all past days. Filter by date, job, or task type. |
+| Hourly Rate per Task | Set a rate per task or job. App calculates earnings automatically. |
+| Clock-Out Reminder | Notification if still clocked in at end of typical workday. |
+
+### Phase 3 — Power Features
+
+| Feature | Description |
+|---|---|
+| Weekly / Monthly Reports | Total hours and earnings rolled up by week, month, or job. |
+| PDF Export | Export any daily summary or job report as a formatted PDF. |
+| Invoice Generator | Turn a completed job into a ready-to-send invoice PDF. |
+| Cloud Backup | Encrypted backup of all records and photos to cloud storage. |
+| CSV Export | Export records for payroll or accounting software. |
+| PIN / Biometric Lock | Secure the app since it contains sensitive work records. |
+| Multi-Worker (Future) | Crew lead can manage and view summaries for multiple workers. |
+
+---
+
+## Daily Workflow (How It Works)
+
+```
+Arrive on site
+    → Open app → Clock In → Camera takes photo → Day starts
+
+Start a task
+    → Tap "New Task" → Camera takes BEFORE photo → Timer starts
+
+Finish a task
+    → Tap "End Task" → Camera takes AFTER photo → Timer stops
+    → Name the task → App rounds to nearest 15 min → Task saved
+
+Repeat for each task throughout the day...
+
+End of day
+    → Tap "Clock Out" → Camera takes photo → Day ends
+    → Review Daily Summary → Edit any times if needed
+    → Tap Share → Choose: Full Day (with photos) or No Photos
+    → Send to manager via WhatsApp / Email / SMS
+```
+
+---
+
+## Manager Share Format
+
+When a summary is shared, the manager receives:
+
+```
+📋 DAILY WORK SUMMARY
+Worker:   Alma
+Date:     Monday, June 9 2026
+Location: 123 Oak Street, Salt Lake City UT
+
+⏰ Clock In:   7:02 AM  📍 123 Oak Street
+⏰ Clock Out:  4:18 PM  📍 123 Oak Street
+⏱  Total Hours: 8.75 hrs  (rounded: 9.0 hrs)
+
+─────────────────────────────────
+TASKS
+─────────────────────────────────
+1. Framing — Master Bedroom
+   Start:    7:15 AM  |  End: 10:00 AM
+   Duration: 2h 45m → rounded to 2h 45m
+   📍 123 Oak Street
+   [BEFORE PHOTO]  [AFTER PHOTO]
+   Notes: Used 2x6 studs, 16" OC
+
+2. Drywall — Hallway
+   Start:    10:15 AM  |  End: 12:00 PM
+   Duration: 1h 45m → rounded to 1h 45m
+   📍 123 Oak Street
+   [BEFORE PHOTO]  [AFTER PHOTO]
+
+3. Lunch Break
+   Start:    12:00 PM  |  End: 12:30 PM
+   Duration: 30m
+
+4. Electrical Rough-In — Kitchen
+   Start:    12:30 PM  |  End: 4:15 PM
+   Duration: 3h 45m → rounded to 3h 45m
+   📍 123 Oak Street
+   [BEFORE PHOTO]  [AFTER PHOTO]
+   Notes: Ran circuits 4, 5, 6. Waiting on inspector.
+
+─────────────────────────────────
+Sent via FieldClock
+```
+
+---
+
+## App Screens (Navigation Structure)
+
+```
+App
+├── Home (Today)
+│   ├── Clock In / Clock Out button
+│   ├── Active task card (if in progress)
+│   ├── Today's task list
+│   └── Daily summary + Share button
+│
+├── Camera
+│   ├── Before photo capture
+│   └── After photo capture
+│
+├── Task Detail
+│   ├── Photos (before / after)
+│   ├── Edit name, time, notes
+│   └── Share this task
+│
+├── Jobs
+│   ├── Active jobs list
+│   ├── Job detail (all days + tasks)
+│   └── Create new job
+│
+├── History
+│   ├── Calendar view
+│   └── Past day summaries
+│
+└── Settings
+    ├── Worker name
+    ├── Default hourly rate
+    ├── Rounding preference (15 / 30 min)
+    ├── Reminder time
+    ├── Export / Backup
+    └── PIN lock
+```
+
+---
+
+## Tech Stack
+
+| Layer | Choice | Reason |
+|---|---|---|
+| Framework | Flutter | Cross-platform, single codebase, great camera support |
+| Language | Dart | Flutter native |
+| Local Database | SQLite (via `sqflite`) | Offline-first, reliable, fast |
+| Camera | `camera` package | Already integrated |
+| Location | `geolocator` package | GPS tagging per task |
+| File Storage | `path_provider` | Local photo storage |
+| PDF Generation | `pdf` package | Export and invoice |
+| Sharing | `share_plus` | Native share sheet |
+| Notifications | `flutter_local_notifications` | Clock-out reminders |
+| State Management | Provider or Riverpod | Simple and maintainable |
+
+---
+
+## Data Models
+
+```
+Worker
+  - id, name, hourly_rate, created_at
+
+Job
+  - id, name, address, client_name, start_date, end_date, status
+
+WorkDay
+  - id, job_id, date
+  - clock_in_time, clock_in_photo, clock_in_location
+  - clock_out_time, clock_out_photo, clock_out_location
+  - total_hours_raw, total_hours_rounded
+
+Task
+  - id, workday_id, name, notes
+  - start_time, start_photo, start_location
+  - end_time, end_photo, end_location
+  - duration_raw, duration_rounded
+  - hourly_rate, earnings
+```
+
+---
+
+## Development Phases & Timeline
+
+### Phase 1 — MVP (Weeks 1–4)
+- [ ] Project setup, navigation, theme
+- [ ] SQLite database + data models
+- [ ] Clock in / clock out with camera
+- [ ] Task before/after photo flow
+- [ ] Auto time calculation + rounding
+- [ ] Task naming and time editing
+- [ ] Daily summary screen
+- [ ] Share summary (text + photos)
+
+### Phase 2 — Core Value (Weeks 5–8)
+- [ ] GPS location tagging
+- [ ] Job/project grouping
+- [ ] Task notes field
+- [ ] Multiple photos per task
+- [ ] History / archive screen
+- [ ] Hourly rate + earnings calc
+- [ ] Clock-out reminder notification
+
+### Phase 3 — Polish & Power (Weeks 9–12)
+- [ ] PDF export
+- [ ] Weekly/monthly reports
+- [ ] Invoice generator
+- [ ] Cloud backup
+- [ ] CSV export
+- [ ] PIN / biometric lock
+- [ ] UI polish and animations
+
+---
+
+## Success Metrics
+
+- Worker can clock in, complete 5 tasks, and send a summary in under 3 minutes total overhead per day
+- Manager can read and approve a summary without needing to ask follow-up questions
+- Zero data loss — records survive app reinstall or phone replacement
+- Works fully offline on a job site with no cell signal
+
+---
+
+## App Name Ideas
+
+| Name | Feel |
+|---|---|
+| **FieldClock** | Professional, clear, construction feel |
+| **Sitelog** | Simple, job-site specific |
+| **TrowelTime** | Trades-specific, memorable |
+| **ClockShot** | Captures the photo + time concept |
+| **ProofLog** | Emphasizes verification for managers |
+
+> Current working title: **FieldClock**
+
+---
+
+*Document created: June 2026*
+*Version: 1.0*
