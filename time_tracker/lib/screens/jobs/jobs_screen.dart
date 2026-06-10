@@ -108,9 +108,9 @@ class _JobCard extends StatelessWidget {
       case 'active':
         return AppColors.success;
       case 'completed':
-        return Theme.of(context).colorScheme.primary;
+        return AppColors.amber;
       default:
-        return Theme.of(context).textTheme.bodyMedium!.color!;
+        return const Color(0xFFCDC8C0);
     }
   }
 

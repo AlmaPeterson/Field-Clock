@@ -582,7 +582,7 @@ class _TaskRow extends StatelessWidget {
                     color: Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.image_not_supported,
+                child: Icon(Icons.image_not_supported,
                     color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
                 ),
             const SizedBox(width: 12),
