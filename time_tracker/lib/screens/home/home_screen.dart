@@ -14,6 +14,7 @@ import '../../utils/prefs_utils.dart';
 import '../task/task_detail_screen.dart';
 import '../jobs/jobs_screen.dart';
 import '../../database/dao/job_dao.dart';
+import 'package:flutter/scheduler.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,13 +23,28 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
   String _workerName = 'Worker';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadName();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadName();
+      context.read<WorkDayProvider>().loadToday();
+    }
   }
 
   Future<void> _loadName() async {
@@ -37,13 +53,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleClockIn(
-        BuildContext context, WorkDayProvider provider) async {
-    final photoPath = await Navigator.push<String?>(
-        context,
-        MaterialPageRoute(
-            builder: (_) => const CameraScreen(mode: CaptureMode.clockIn)),
+      BuildContext context, WorkDayProvider provider) async {
+    final result = await Navigator.push<String?>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const CameraScreen(mode: CaptureMode.clockIn)),
     );
-    if (photoPath == null) return;
+    if (result == null) return; // user cancelled (X button)
+    final photoPath = result == 'skip' ? null : result;
     final location = await LocationUtils.getCurrentLocation();
     final jobId = await _pickJob(context);
     await provider.clockIn(
@@ -52,31 +69,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handleClockOut(
       BuildContext context, WorkDayProvider provider) async {
-    final photoPath = await Navigator.push<String?>(
+    final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
           builder: (_) => const CameraScreen(mode: CaptureMode.clockOut)),
     );
-    if (photoPath == null) return;
+    if (result == null) return;
+    final photoPath = result == 'skip' ? null : result;
     final location = await LocationUtils.getCurrentLocation();
     await provider.clockOut(photoPath: photoPath, location: location);
   }
 
   Future<void> _handleStartTask(
       BuildContext context, WorkDayProvider provider) async {
-    final photoPath = await Navigator.push<String?>(
+    final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
           builder: (_) => const CameraScreen(mode: CaptureMode.taskStart)),
     );
-    if (photoPath == null) return;
+    if (result == null) return;
+    final photoPath = result == 'skip' ? null : result;
     final location = await LocationUtils.getCurrentLocation();
     await provider.startTask(photoPath: photoPath, location: location);
   }
 
   Future<void> _handleEndTask(
       BuildContext context, WorkDayProvider provider) async {
-    final photoPath = await Navigator.push<String?>(
+    final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
         builder: (_) => CameraScreen(
@@ -85,17 +104,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (photoPath == null) return;
+    if (result == null) return;
+    final photoPath = result == 'skip' ? null : result;
     final location = await LocationUtils.getCurrentLocation();
     if (!context.mounted) return;
-    final result = await showDialog<Map<String, String>>(
+    final taskResult = await showDialog<Map<String, String>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const TaskNameDialog(),
     );
     await provider.endTask(
-      name: result?['name'] ?? 'Unnamed Task',
-      notes: result?['notes'],
+      name: taskResult?['name'] ?? 'Unnamed Task',
+      notes: taskResult?['notes'],
       photoPath: photoPath,
       location: location,
     );
@@ -108,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return showModalBottomSheet<int>(
         context: context,
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).cardColor,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
         builder: (_) => Padding(
@@ -122,20 +142,20 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             ...jobs.map((job) => ListTile(
                     title: Text(job.name,
-                        style: const TextStyle(
-                            color: AppTheme.onBackground)),
+                        style: TextStyle(
+                            color: Theme.of(context).textTheme.bodyLarge!.color!)),
                     subtitle: job.address != null
                         ? Text(job.address!,
-                            style: const TextStyle(
-                                color: AppTheme.onSurface))
+                            style: TextStyle(
+                                color: Theme.of(context).textTheme.bodyMedium!.color!))
                         : null,
-                    trailing: const Icon(Icons.chevron_right,
-                        color: AppTheme.onSurface),
+                    trailing: Icon(Icons.chevron_right,
+                        color: Theme.of(context).textTheme.bodyMedium!.color!),
                     onTap: () => Navigator.pop(context, job.id),
                 )),
             ListTile(
-                title: const Text('No specific job',
-                    style: TextStyle(color: AppTheme.onSurface)),
+                title: Text('No specific job',
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!)),
                 onTap: () => Navigator.pop(context, null),
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -196,6 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 provider: provider,
                 onClockIn: () => _handleClockIn(context, provider),
                 onClockOut: () => _handleClockOut(context, provider),
+                onResetClockIn: () => provider.resetClockIn(),
+                onResetClockOut: () => provider.resetClockOut(),
               ),
               const SizedBox(height: 16),
               if (provider.isClockedIn && !provider.today!.isComplete) ...[
@@ -212,12 +234,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.summarize,
-                        color: AppTheme.primary),
-                    label: const Text('View & Share Daily Summary',
-                        style: TextStyle(color: AppTheme.primary)),
+                    icon: Icon(Icons.summarize,
+                        color: Theme.of(context).colorScheme.primary),
+                    label: Text('View & Share Daily Summary',
+                        style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primary),
+                      side: BorderSide(color: Theme.of(context).colorScheme.primary),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -248,11 +270,15 @@ class _ClockCard extends StatelessWidget {
   final WorkDayProvider provider;
   final VoidCallback onClockIn;
   final VoidCallback onClockOut;
+  final VoidCallback onResetClockIn;
+  final VoidCallback onResetClockOut;
 
   const _ClockCard({
     required this.provider,
     required this.onClockIn,
     required this.onClockOut,
+    required this.onResetClockIn,
+    required this.onResetClockOut,
   });
 
   @override
@@ -267,7 +293,6 @@ class _ClockCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status dot + label
             Row(
               children: [
                 Container(
@@ -275,10 +300,12 @@ class _ClockCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isClockedIn
-                        ? AppTheme.success
+                        ? AppColors.success
                         : isComplete
-                            ? AppTheme.primary
-                            : AppTheme.onSurface,
+                            ? provider.today != null
+                                ? Theme.of(context).colorScheme.primary
+                                : AppColors.success
+                            : Colors.grey,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -290,24 +317,81 @@ class _ClockCard extends StatelessWidget {
                           : 'NOT CLOCKED IN',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: isClockedIn
-                        ? AppTheme.success
+                        ? AppColors.success
                         : isComplete
-                            ? AppTheme.primary
-                            : AppTheme.onSurface,
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey,
                   ),
                 ),
+                const Spacer(),
+                // Reset clock-in button
+                if (today != null && !isComplete)
+                  IconButton(
+                    icon: const Icon(Icons.undo, size: 18),
+                    tooltip: isClockedIn
+                        ? 'Undo Clock In'
+                        : 'Undo Clock Out',
+                    color: AppColors.error,
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          backgroundColor:
+                              Theme.of(context).cardColor,
+                          title: Text(
+                            isClockedIn
+                                ? 'Undo Clock In?'
+                                : 'Undo Clock Out?',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color),
+                          ),
+                          content: Text(
+                            isClockedIn
+                                ? 'This will delete today\'s clock-in and all tasks. Cannot be undone.'
+                                : 'This will remove your clock-out time.',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.color),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(context, true),
+                              child: Text('Confirm',
+                                  style: TextStyle(
+                                      color: AppColors.error)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        if (isClockedIn) {
+                          onResetClockIn();
+                        } else {
+                          onResetClockOut();
+                        }
+                      }
+                    },
+                  ),
               ],
             ),
             const SizedBox(height: 12),
-
-            // Clock in photo + time
             if (today?.clockInTime != null)
               _TimePhotoRow(
                 label: 'In',
                 time: TimeUtils.formatTime(today!.clockInTime!),
                 photoPath: today.clockInPhoto,
               ),
-
             if (today?.clockOutTime != null) ...[
               const SizedBox(height: 8),
               _TimePhotoRow(
@@ -318,26 +402,29 @@ class _ClockCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Total: ${TimeUtils.formatDuration(today.totalDurationRounded)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.primary,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
-
             if (!isComplete) ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: Icon(isClockedIn
-                      ? Icons.logout : Icons.login),
-                  label: Text(isClockedIn ? 'Clock Out' : 'Clock In'),
+                      ? Icons.logout
+                      : Icons.login),
+                  label: Text(
+                      isClockedIn ? 'Clock Out' : 'Clock In'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isClockedIn
-                        ? AppTheme.error : AppTheme.primary,
+                        ? AppColors.error
+                        : Theme.of(context).colorScheme.primary,
                   ),
-                  onPressed: isClockedIn ? onClockOut : onClockIn,
+                  onPressed:
+                      isClockedIn ? onClockOut : onClockIn,
                 ),
               ),
             ],
@@ -367,7 +454,7 @@ class _TaskActionCard extends StatelessWidget {
 
     if (activeTask != null) {
       return Card(
-        color: AppTheme.surfaceAlt,
+        color: Theme.of(context).dividerColor,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -375,7 +462,7 @@ class _TaskActionCard extends StatelessWidget {
             children: [
               Text('ACTIVE TASK',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppTheme.success,
+                    color: AppColors.success,
                   )),
               const SizedBox(height: 4),
               Text(
@@ -389,7 +476,7 @@ class _TaskActionCard extends StatelessWidget {
                   icon: const Icon(Icons.camera_alt),
                   label: const Text('Take After Photo & End Task'),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary),
+                      backgroundColor: Theme.of(context).colorScheme.primary),
                   onPressed: onEndTask,
                 ),
               ),
@@ -404,7 +491,7 @@ class _TaskActionCard extends StatelessWidget {
       child: ElevatedButton.icon(
         icon: const Icon(Icons.camera_alt),
         label: const Text('Take Before Photo & Start Task'),
-        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+        style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
         onPressed: onStartTask,
       ),
     );
@@ -432,7 +519,7 @@ class _TaskListCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 12),
             ...tasks.map((task) => _TaskRow(task: task)),
-            const Divider(color: AppTheme.surfaceAlt, height: 24),
+            Divider(color: Theme.of(context).dividerColor, height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -444,7 +531,7 @@ class _TaskListCard extends StatelessWidget {
                         0, (s, t) => s + t.durationMinutesRounded),
                   )),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
@@ -492,11 +579,11 @@ class _TaskRow extends StatelessWidget {
                 Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                    color: AppTheme.surfaceAlt,
+                    color: Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Icon(Icons.image_not_supported,
-                    color: AppTheme.onSurface, size: 18),
+                    color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
                 ),
             const SizedBox(width: 12),
             Expanded(
@@ -515,7 +602,7 @@ class _TaskRow extends StatelessWidget {
             Text(
                 TimeUtils.formatDuration(task.durationRounded),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppTheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w600,
                 ),
             ),
@@ -555,7 +642,7 @@ class _TimePhotoRow extends StatelessWidget {
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceAlt,
+              color: Theme.of(context).dividerColor,
               borderRadius: BorderRadius.circular(6),
             ),
           ),

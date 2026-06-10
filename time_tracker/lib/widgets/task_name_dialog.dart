@@ -22,7 +22,7 @@ class _TaskNameDialogState extends State<TaskNameDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -36,39 +36,39 @@ class _TaskNameDialogState extends State<TaskNameDialog> {
             TextField(
               controller: _controller,
               autofocus: true,
-              style: const TextStyle(color: AppTheme.onBackground),
+              style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!),
               decoration: InputDecoration(
                 hintText: 'e.g. Framing — Master Bedroom',
-                hintStyle: const TextStyle(color: AppTheme.onSurface),
+                hintStyle: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!),
                 filled: true,
-                fillColor: AppTheme.surfaceAlt,
+                fillColor: Theme.of(context).dividerColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppTheme.primary),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _notesController,
-              style: const TextStyle(color: AppTheme.onBackground),
+              style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!),
               maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Notes (optional) — materials, issues...',
-                hintStyle: const TextStyle(color: AppTheme.onSurface),
+                hintStyle: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!),
                 filled: true,
-                fillColor: AppTheme.surfaceAlt,
+                fillColor: Theme.of(context).dividerColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppTheme.primary),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -79,8 +79,8 @@ class _TaskNameDialogState extends State<TaskNameDialog> {
                   child: TextButton(
                     onPressed: () => Navigator.pop(context,
                         {'name': 'Unnamed Task', 'notes': ''}),
-                    child: const Text('Skip',
-                        style: TextStyle(color: AppTheme.onSurface)),
+                    child: Text('Skip',
+                        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!)),
                   ),
                 ),
                 const SizedBox(width: 8),

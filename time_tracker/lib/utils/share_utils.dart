@@ -264,4 +264,40 @@ class ShareUtils {
       subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}',
     );
   }
+
+  /// Share a single task summary
+  static Future<void> shareTask({required Task task}) async {
+    final buffer = StringBuffer();
+    buffer.writeln('🔨 TASK SUMMARY');
+    buffer.writeln('Task:     ${task.name}');
+    buffer.writeln(
+        'Start:    ${TimeUtils.formatTime(task.startTime)}');
+    if (task.endTime != null)
+      buffer.writeln(
+          'End:      ${TimeUtils.formatTime(task.endTime!)}');
+    buffer.writeln(
+        'Duration: ${TimeUtils.formatDuration(task.durationRounded)}');
+    if (task.startLocation != null)
+      buffer.writeln('📍 ${task.startLocation}');
+    if (task.notes != null && task.notes!.isNotEmpty)
+      buffer.writeln('Notes: ${task.notes}');
+    buffer.writeln('');
+    buffer.writeln('Sent via FieldClock');
+
+    final List<XFile> files = [];
+    for (final path in [task.startPhoto, task.endPhoto]) {
+      if (path != null && File(path).existsSync()) {
+        files.add(XFile(path));
+      }
+    }
+
+    if (files.isEmpty) {
+      await Share.share(buffer.toString(),
+          subject: 'Task: ${task.name}');
+    } else {
+      await Share.shareXFiles(files,
+          text: buffer.toString(),
+          subject: 'Task: ${task.name}');
+    }
+  }
 }

@@ -47,19 +47,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           timePickerTheme: TimePickerThemeData(
-            backgroundColor: AppTheme.surface,
-            hourMinuteColor: AppTheme.surfaceAlt,
-            hourMinuteTextColor: AppTheme.onBackground,
-            dayPeriodColor: AppTheme.surfaceAlt,
-            dayPeriodTextColor: AppTheme.onBackground,
-            dialBackgroundColor: AppTheme.surfaceAlt,
-            dialHandColor: AppTheme.primary,
-            dialTextColor: AppTheme.onBackground,
-            entryModeIconColor: AppTheme.primary,
+            backgroundColor: Theme.of(context).cardColor,
+            hourMinuteColor: Theme.of(context).dividerColor,
+            hourMinuteTextColor: Theme.of(context).textTheme.bodyLarge!.color!,
+            dayPeriodColor: Theme.of(context).dividerColor,
+            dayPeriodTextColor: Theme.of(context).textTheme.bodyLarge!.color!,
+            dialBackgroundColor: Theme.of(context).dividerColor,
+            dialHandColor: Theme.of(context).colorScheme.primary,
+            dialTextColor: Theme.of(context).textTheme.bodyLarge!.color!,
+            entryModeIconColor: Theme.of(context).colorScheme.primary,
           ),
-          colorScheme: const ColorScheme.dark(
-            primary: AppTheme.primary,
-            surface: AppTheme.surface,
+          colorScheme: ColorScheme.dark(
+            primary: Theme.of(context).colorScheme.primary,
+            surface: Theme.of(context).cardColor,
           ),
         ),
         child: child!,
@@ -129,22 +129,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: const Text('Delete Task',
-            style: TextStyle(color: AppTheme.onBackground)),
-        content: const Text(
+        backgroundColor: Theme.of(context).cardColor,
+        title: Text('Delete Task',
+            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!)),
+        content: Text(
             'Are you sure? This cannot be undone.',
-            style: TextStyle(color: AppTheme.onSurface)),
+            style: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppTheme.onSurface)),
+            child: Text('Cancel',
+                style: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.error)),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -161,21 +161,21 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         title: const Text('Edit Task'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppTheme.error),
+            icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
             onPressed: _delete,
           ),
           TextButton(
             onPressed: _saving ? null : _save,
             child: _saving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppTheme.primary),
+                        strokeWidth: 2, color: Theme.of(context).colorScheme.primary),
                   )
-                : const Text('Save',
+                : Text('Save',
                     style: TextStyle(
-                        color: AppTheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w700)),
           ),
         ],
@@ -204,7 +204,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   time: _startTime,
                   onTap: () => _pickTime(isStart: true),
                 ),
-                const Divider(height: 1, color: AppTheme.surfaceAlt),
+                Divider(height: 1, color: Theme.of(context).dividerColor),
                 _TimeRow(
                   label: 'End',
                   time: _endTime,
@@ -218,10 +218,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           if (_endTime != null) ...[
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(
+              padding: EdgeInsets.symmetric(
                   horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -232,8 +232,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   Text(
                     TimeUtils.formatDuration(
                         Duration(minutes: _roundedMinutes)),
-                    style: const TextStyle(
-                      color: AppTheme.primary,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -286,8 +286,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on,
-                        color: AppTheme.onSurface, size: 18),
+                    Icon(Icons.location_on,
+                        color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(widget.task.startLocation!,
@@ -303,12 +303,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
           // Delete button
           OutlinedButton.icon(
-            icon: const Icon(Icons.delete_outline,
-                color: AppTheme.error),
-            label: const Text('Delete Task',
-                style: TextStyle(color: AppTheme.error)),
+            icon: Icon(Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error),
+            label: Text('Delete Task',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppTheme.error),
+              side: BorderSide(color: Theme.of(context).colorScheme.error),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -351,12 +351,12 @@ class _InputField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
-        style: const TextStyle(color: AppTheme.onBackground),
+        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: AppTheme.onSurface),
+          hintStyle: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!),
           filled: true,
-          fillColor: AppTheme.surfaceAlt,
+          fillColor: Theme.of(context).dividerColor,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
@@ -364,7 +364,7 @@ class _InputField extends StatelessWidget {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide:
-                const BorderSide(color: AppTheme.primary),
+                BorderSide(color: Theme.of(context).colorScheme.primary),
           ),
         ),
       );
@@ -400,15 +400,15 @@ class _TimeRow extends StatelessWidget {
                         : 'Not set',
                     style: TextStyle(
                       color: time != null
-                          ? AppTheme.primary
-                          : AppTheme.onSurface,
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).textTheme.bodyMedium!.color!,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.edit,
-                      size: 14, color: AppTheme.onSurface),
+                  Icon(Icons.edit,
+                      size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                 ],
               ),
             ],

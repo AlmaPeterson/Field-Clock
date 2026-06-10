@@ -7,6 +7,7 @@ import '../../utils/time_utils.dart';
 import '../../utils/share_utils.dart';
 import '../../database/dao/task_dao.dart';
 import '../task/task_detail_screen.dart';
+import '../../utils/share_utils.dart';
 
 class SummaryScreen extends StatefulWidget {
   final WorkDay day;
@@ -47,7 +48,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
   void _showShareSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -124,8 +125,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -208,12 +209,12 @@ class _DayOverviewCard extends StatelessWidget {
             ),
             if (day.clockInLocation != null) ...[
               const SizedBox(height: 12),
-              const Divider(color: AppTheme.surfaceAlt),
+              Divider(color: Theme.of(context).dividerColor),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.location_on,
-                      size: 14, color: AppTheme.onSurface),
+                  Icon(Icons.location_on,
+                      size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                   const SizedBox(width: 4),
                   Text(day.clockInLocation!,
                       style: Theme.of(context).textTheme.bodyMedium),
@@ -255,13 +256,13 @@ class _StatBlock extends StatelessWidget {
           Text(label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontSize: 10,
-                    color: AppTheme.onSurface,
+                    color: Theme.of(context).textTheme.bodyMedium!.color!,
                   )),
           const SizedBox(height: 2),
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: highlight ? AppTheme.primary : AppTheme.onBackground,
+                  color: highlight ? Theme.of(context).colorScheme.primary : Theme.of(context).textTheme.bodyLarge!.color!,
                   fontWeight: FontWeight.w700,
                 ),
           ),
@@ -300,37 +301,51 @@ class _TaskDetailCard extends StatelessWidget {
             children: [
                 // Task name + duration
                 Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
                     Expanded(
-                    child: Text(task.name,
-                        style: Theme.of(context).textTheme.titleMedium),
+                      child: Text(task.name,
+                          style: Theme.of(context).textTheme.titleMedium),
                     ),
+                    // Share this task
+                    IconButton(
+                      icon: Icon(Icons.share,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary),
+                      tooltip: 'Share this task',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _shareTask(context, task),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.15),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
+                      ),
+                      child: Text(
                         TimeUtils.formatDuration(task.durationRounded),
-                        style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
+                      ),
                     ),
-                    ),
-                ],
+                  ],
                 ),
                 const SizedBox(height: 8),
 
                 // Time range
                 Row(
                 children: [
-                    const Icon(Icons.access_time,
-                        size: 14, color: AppTheme.onSurface),
+                    Icon(Icons.access_time,
+                        size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                     const SizedBox(width: 4),
                     Text(
                     '${TimeUtils.formatTime(task.startTime)} → ${task.endTime != null ? TimeUtils.formatTime(task.endTime!) : 'In progress'}',
@@ -344,8 +359,8 @@ class _TaskDetailCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                     children: [
-                    const Icon(Icons.location_on,
-                        size: 14, color: AppTheme.onSurface),
+                    Icon(Icons.location_on,
+                        size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                     const SizedBox(width: 4),
                     Expanded(
                         child: Text(task.startLocation!,
@@ -362,7 +377,7 @@ class _TaskDetailCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                    color: AppTheme.surfaceAlt,
+                    color: Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(task.notes!,
@@ -391,6 +406,10 @@ class _TaskDetailCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _shareTask(BuildContext context, Task task) {
+    ShareUtils.shareTask(task: task);
   }
 }
 
@@ -450,7 +469,7 @@ class _ShareOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceAlt,
+          color: Theme.of(context).dividerColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -458,10 +477,10 @@ class _ShareOption extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.15),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: AppTheme.primary, size: 22),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -475,7 +494,7 @@ class _ShareOption extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppTheme.onSurface),
+            Icon(Icons.chevron_right, color: Theme.of(context).textTheme.bodyMedium!.color!),
           ],
         ),
       ),

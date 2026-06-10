@@ -4,6 +4,7 @@ import '../models/task.dart';
 import '../database/dao/work_day_dao.dart';
 import '../database/dao/task_dao.dart';
 import '../utils/time_utils.dart';
+import '../database/database_helper.dart';
 
 class WorkDayProvider extends ChangeNotifier {
   final WorkDayDao _workDayDao = WorkDayDao();
@@ -55,6 +56,39 @@ class WorkDayProvider extends ChangeNotifier {
       clockOutLocation: location,
       totalMinutesRaw: raw.inMinutes,
       totalMinutesRounded: rounded.inMinutes,
+    );
+    await _workDayDao.update(updated);
+    _today = updated;
+    notifyListeners();
+  }
+
+  Future<void> resetClockIn() async {
+    if (_today == null) return;
+    // Delete all tasks for today first
+    for (final task in _todayTasks) {
+      if (task.id != null) await _taskDao.delete(task.id!);
+    }
+    // Delete the work day
+    final db = await DatabaseHelper.instance.database;
+    await db.delete('work_days',
+        where: 'id = ?', whereArgs: [_today!.id]);
+    _today = null;
+    _todayTasks = [];
+    _activeTask = null;
+    notifyListeners();
+  }
+
+  Future<void> resetClockOut() async {
+    if (_today == null || _today!.clockOutTime == null) return;
+    final updated = WorkDay(
+      id: _today!.id,
+      jobId: _today!.jobId,
+      date: _today!.date,
+      clockInTime: _today!.clockInTime,
+      clockInPhoto: _today!.clockInPhoto,
+      clockInLocation: _today!.clockInLocation,
+      totalMinutesRaw: 0,
+      totalMinutesRounded: 0,
     );
     await _workDayDao.update(updated);
     _today = updated;

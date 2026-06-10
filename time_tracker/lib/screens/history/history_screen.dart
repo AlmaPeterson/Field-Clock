@@ -60,8 +60,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('History')),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : _days.isEmpty
               ? _EmptyState()
               : ListView(
@@ -138,9 +138,9 @@ class _MonthlyBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.12),
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+        border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +149,7 @@ class _MonthlyBanner extends StatelessWidget {
               style: Theme.of(context)
                   .textTheme
                   .labelLarge
-                  ?.copyWith(color: AppTheme.primary)),
+                  ?.copyWith(color: Theme.of(context).colorScheme.primary)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -187,7 +187,7 @@ class _BannerStat extends StatelessWidget {
         children: [
           Text(value,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppTheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                     fontSize: 22,
                   )),
           const SizedBox(height: 2),
@@ -235,8 +235,8 @@ class _DayCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: isComplete
-                      ? AppTheme.primary.withOpacity(0.15)
-                      : AppTheme.surfaceAlt,
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.15)
+                      : Theme.of(context).dividerColor,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
@@ -247,8 +247,8 @@ class _DayCard extends StatelessWidget {
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: isComplete
-                            ? AppTheme.primary
-                            : AppTheme.onSurface,
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).textTheme.bodyMedium!.color!,
                       ),
                     ),
                     Text(
@@ -257,8 +257,8 @@ class _DayCard extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isComplete
-                            ? AppTheme.primary
-                            : AppTheme.onSurface,
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).textTheme.bodyMedium!.color!,
                       ),
                     ),
                   ],
@@ -291,7 +291,7 @@ class _DayCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
-                            ?.copyWith(color: AppTheme.onSurface),
+                            ?.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!),
                       ),
                     ],
                   ],
@@ -306,13 +306,13 @@ class _DayCard extends StatelessWidget {
                     TimeUtils.formatDuration(
                         Duration(minutes: totalMinutes)),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
                   const SizedBox(height: 4),
-                  const Icon(Icons.chevron_right,
-                      color: AppTheme.onSurface, size: 18),
+                  Icon(Icons.chevron_right,
+                      color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
                 ],
               ),
             ],
@@ -348,7 +348,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.history, size: 64, color: AppTheme.onSurface),
+          Icon(Icons.history, size: 64, color: Theme.of(context).textTheme.bodyMedium!.color!),
           const SizedBox(height: 16),
           Text('No history yet',
               style: Theme.of(context).textTheme.titleMedium),

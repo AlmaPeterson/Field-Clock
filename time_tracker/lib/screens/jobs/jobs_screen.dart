@@ -39,7 +39,7 @@ class _JobsScreenState extends State<JobsScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _NewJobSheet(onSaved: _load),
@@ -59,8 +59,8 @@ class _JobsScreenState extends State<JobsScreen> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : _jobs.isEmpty
               ? _EmptyState(onAdd: _newJob)
               : ListView(
@@ -80,7 +80,7 @@ class _JobsScreenState extends State<JobsScreen> {
                 ),
       floatingActionButton: _jobs.isNotEmpty
           ? FloatingActionButton(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.black,
               onPressed: _newJob,
               child: const Icon(Icons.add),
@@ -106,11 +106,11 @@ class _JobCard extends StatelessWidget {
   Color get _statusColor {
     switch (job.status) {
       case 'active':
-        return AppTheme.success;
+        return AppColors.success;
       case 'completed':
-        return AppTheme.primary;
+        return Theme.of(context).colorScheme.primary;
       default:
-        return AppTheme.onSurface;
+        return Theme.of(context).textTheme.bodyMedium!.color!;
     }
   }
 
@@ -156,8 +156,8 @@ class _JobCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.location_on,
-                        size: 14, color: AppTheme.onSurface),
+                    Icon(Icons.location_on,
+                        size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(job.address!,
@@ -171,8 +171,8 @@ class _JobCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline,
-                        size: 14, color: AppTheme.onSurface),
+                    Icon(Icons.person_outline,
+                        size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
                     const SizedBox(width: 4),
                     Text(job.clientName!,
                         style:
@@ -186,7 +186,7 @@ class _JobCard extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: AppTheme.onSurface),
+                    ?.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!),
               ),
             ],
           ),
@@ -252,23 +252,23 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         title: Text(_job.name),
         actions: [
           PopupMenuButton<String>(
-            color: AppTheme.surface,
+            color: Theme.of(context).cardColor,
             onSelected: _updateStatus,
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'active',
                 child: Text('Mark Active',
-                    style: TextStyle(color: AppTheme.onBackground)),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!)),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'completed',
                 child: Text('Mark Completed',
-                    style: TextStyle(color: AppTheme.onBackground)),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!)),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'paused',
                 child: Text('Mark Paused',
-                    style: TextStyle(color: AppTheme.onBackground)),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!)),
               ),
             ],
             child: const Padding(
@@ -279,8 +279,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -302,7 +302,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               text: _job.clientName!),
                         ],
                         const SizedBox(height: 12),
-                        const Divider(color: AppTheme.surfaceAlt),
+                        Divider(color: Theme.of(context).dividerColor),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -328,12 +328,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 const SizedBox(height: 20),
 
                 if (_days.isEmpty)
-                  const Center(
+                  Center(
                     child: Padding(
                       padding: EdgeInsets.all(32),
                       child: Text('No days logged for this job yet.',
                           style:
-                              TextStyle(color: AppTheme.onSurface)),
+                              TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!)),
                     ),
                   )
                 else ...[
@@ -386,7 +386,7 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
         children: [
-          Icon(icon, size: 16, color: AppTheme.onSurface),
+          Icon(icon, size: 16, color: Theme.of(context).textTheme.bodyMedium!.color!),
           const SizedBox(width: 8),
           Expanded(
               child: Text(text,
@@ -408,7 +408,7 @@ class _StatBlock extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .headlineMedium
-                    ?.copyWith(fontSize: 20, color: AppTheme.primary)),
+                    ?.copyWith(fontSize: 20, color: Theme.of(context).colorScheme.primary)),
             const SizedBox(height: 2),
             Text(label,
                 style: Theme.of(context)
@@ -470,8 +470,8 @@ class _DayRow extends StatelessWidget {
                     Text(
                       TimeUtils.formatDuration(
                           Duration(minutes: totalMinutes)),
-                      style: const TextStyle(
-                        color: AppTheme.primary,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -481,8 +481,8 @@ class _DayRow extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right,
-                    color: AppTheme.onSurface, size: 18),
+                Icon(Icons.chevron_right,
+                    color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
               ],
             ),
           ),
@@ -599,14 +599,14 @@ class _SheetField extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TextField(
         controller: controller,
-        style: const TextStyle(color: AppTheme.onBackground),
+        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color!),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: AppTheme.onSurface),
+          labelStyle: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!),
           hintText: hint,
-          hintStyle: const TextStyle(color: AppTheme.onSurface),
+          hintStyle: TextStyle(color: Theme.of(context).textTheme.bodyMedium!.color!),
           filled: true,
-          fillColor: AppTheme.surfaceAlt,
+          fillColor: Theme.of(context).dividerColor,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
@@ -614,7 +614,7 @@ class _SheetField extends StatelessWidget {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide:
-                const BorderSide(color: AppTheme.primary),
+                BorderSide(color: Theme.of(context).colorScheme.primary),
           ),
         ),
       );
@@ -631,8 +631,8 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.work_outline,
-                size: 64, color: AppTheme.onSurface),
+            Icon(Icons.work_outline,
+                size: 64, color: Theme.of(context).textTheme.bodyMedium!.color!),
             const SizedBox(height: 16),
             Text('No jobs yet',
                 style: Theme.of(context).textTheme.titleMedium),
