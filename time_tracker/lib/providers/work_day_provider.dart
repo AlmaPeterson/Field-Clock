@@ -209,6 +209,7 @@ class WorkDayProvider extends ChangeNotifier {
 
   Future<void> endTask({
     required String name,
+    String? division,
     String? photoPath,
     String? location,
     String? notes,
@@ -220,6 +221,7 @@ class WorkDayProvider extends ChangeNotifier {
     final rounded = TimeUtils.roundToNearest15(raw);
     final updated = _activeTask!.copyWith(
       name: name,
+      division: division,
       endTime: now,
       endPhoto: photoPath,
       endLocation: location,

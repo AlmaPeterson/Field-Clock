@@ -18,7 +18,7 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -38,6 +38,22 @@ class DatabaseHelper {
           clock_out_location TEXT,
           duration_minutes INTEGER DEFAULT 0,
           FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      // Add division to tasks
+      await db.execute(
+          'ALTER TABLE tasks ADD COLUMN division TEXT');
+      // Add task_photos table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS task_photos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          photo_path TEXT NOT NULL,
+          photo_type TEXT DEFAULT 'general',
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id)
         )
       ''');
     }
@@ -102,6 +118,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         work_day_id INTEGER NOT NULL,
         name TEXT DEFAULT 'Unnamed Task',
+        division TEXT,
         notes TEXT,
         start_time TEXT NOT NULL,
         start_photo TEXT,
@@ -112,7 +129,18 @@ class DatabaseHelper {
         duration_minutes_raw INTEGER DEFAULT 0,
         duration_minutes_rounded INTEGER DEFAULT 0,
         hourly_rate REAL DEFAULT 0.0,
-        FOREIGN KEY (work_day_id) REFERENCES tasks(id)
+        FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE task_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        photo_path TEXT NOT NULL,
+        photo_type TEXT DEFAULT 'general',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (task_id) REFERENCES tasks(id)
       )
     ''');
   }

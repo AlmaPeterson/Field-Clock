@@ -116,6 +116,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
     );
     await provider.endTask(
       name: taskResult?['name'] ?? 'Unnamed Task',
+      division: taskResult?['division'],
       notes: taskResult?['notes'],
       photoPath: photoPath,
       location: location,

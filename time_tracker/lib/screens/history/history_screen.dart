@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/time_utils.dart';
 import '../summary/summary_screen.dart';
 import '../../utils/prefs_utils.dart';
+import 'past_day_entry_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -58,7 +59,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
+      appBar: AppBar(
+        title: const Text('History'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Log Past Day',
+            onPressed: () async {
+              final saved = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const PastDayEntryScreen()),
+              );
+              if (saved == true) _load();
+            },
+          ),
+        ],
+      ),
       body: _loading
           ? Center(
               child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
