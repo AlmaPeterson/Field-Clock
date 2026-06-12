@@ -43,4 +43,23 @@ class WorkDayDao {
     return await db.update('work_days', day.toMap(),
         where: 'id = ?', whereArgs: [day.id]);
   }
+
+  Future<WorkDay?> getByDate(DateTime date) async {
+    final db = await DatabaseHelper.instance.database;
+    final dateStr = date.toIso8601String().substring(0, 10);
+    final maps = await db.query(
+      'work_days',
+      where: "date LIKE ?",
+      whereArgs: ['$dateStr%'],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return WorkDay.fromMap(maps.first);
+  }
+
+  Future<void> deleteDay(int workDayId) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.delete('work_days',
+        where: 'id = ?', whereArgs: [workDayId]);
+  }
 }

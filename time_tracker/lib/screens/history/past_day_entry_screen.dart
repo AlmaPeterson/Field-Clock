@@ -88,7 +88,41 @@ class _PastDayEntryScreenState
     setState(() => _saving = true);
 
     try {
-      // Create work day
+    // Check for duplicate
+    final existing =
+        await WorkDayDao().getByDate(_selectedDate);
+    if (existing != null && mounted) {
+        setState(() => _saving = false);
+        final overwrite = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+            backgroundColor: Theme.of(context).cardColor,
+            title: const Text('Day Already Exists'),
+            content: Text(
+                'A record for ${TimeUtils.formatDate(_selectedDate)} already exists. Do you want to add to it or cancel?'),
+            actions: [
+            TextButton(
+                onPressed: () =>
+                    Navigator.pop(context, false),
+                child: const Text('Cancel'),
+            ),
+            TextButton(
+                onPressed: () =>
+                    Navigator.pop(context, true),
+                child: Text('Add Anyway',
+                    style: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary)),
+            ),
+            ],
+        ),
+        );
+        if (overwrite != true) return;
+        setState(() => _saving = true);
+    }
+
+    // Create work day
       final firstSession = _sessions.first;
       final day = WorkDay(
         date: _selectedDate,

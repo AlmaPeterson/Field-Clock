@@ -104,17 +104,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               day: day,
                               tasks: _tasksByDay[day.id] ?? [],
                                 onTap: () async {
-                                final name = await PrefsUtils.getWorkerName();
-                                if (!context.mounted) return;
-                                await Navigator.push(
+                                  final name = await PrefsUtils.getWorkerName();
+                                  if (!context.mounted) return;
+                                  final result = await Navigator.push<dynamic>(
                                     context,
                                     MaterialPageRoute(
-                                    builder: (_) => SummaryScreen(
+                                      builder: (_) => SummaryScreen(
                                         day: day,
                                         workerName: name,
+                                      ),
                                     ),
-                                    ),
-                                );
+                                  );
+                                  if (result == 'deleted' || result == true) {
+                                    _load();
+                                  }
                                 },
                             )),
                         const SizedBox(height: 8),

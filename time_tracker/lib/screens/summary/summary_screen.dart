@@ -10,6 +10,8 @@ import '../task/task_detail_screen.dart';
 import '../../utils/share_utils.dart';
 import '../../models/session.dart';
 import '../../database/dao/session_dao.dart';
+import '../history/edit_day_screen.dart';
+import '../../database/database_helper.dart';
 
 class SummaryScreen extends StatefulWidget {
   final WorkDay day;
@@ -127,6 +129,33 @@ class _SummaryScreenState extends State<SummaryScreen> {
       appBar: AppBar(
         title: const Text('Daily Summary'),
         actions: [
+          // Edit day
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Day',
+            onPressed: () async {
+              final result = await Navigator.push<dynamic>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      EditDayScreen(day: widget.day),
+                ),
+              );
+              if (result == 'deleted') {
+                if (mounted) Navigator.pop(context, 'deleted');
+              } else if (result == true) {
+                _load();
+              }
+            },
+          ),
+          // Delete day
+          IconButton(
+            icon: Icon(Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error),
+            tooltip: 'Delete Day',
+            onPressed: _deleteDay,
+          ),
+          // Share
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: _showShareSheet,
@@ -179,6 +208,53 @@ class _SummaryScreenState extends State<SummaryScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _deleteDay() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        title: const Text('Delete This Day?'),
+        content: Text(
+          'This will permanently delete ${TimeUtils.formatDate(widget.day.date)}, all its sessions, tasks, and photos. This cannot be undone.',
+          style: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, true),
+            child: Text('Delete',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    if (widget.day.id == null) return;
+
+    await DatabaseHelper.instance
+        .deleteDayCascade(widget.day.id!);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Day deleted')),
+      );
+      Navigator.pop(context, 'deleted');
+    }
   }
 }
 
@@ -433,6 +509,34 @@ class _TaskDetailCard extends StatelessWidget {
                     ),
                     ],
                 ),
+                ],
+
+                // Division badge
+                if (task.division != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.category_outlined,
+                          size: 14,
+                          color: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.color),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          task.division!,
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
 
                 // Notes

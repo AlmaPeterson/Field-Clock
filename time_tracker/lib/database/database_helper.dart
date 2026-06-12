@@ -149,4 +149,47 @@ class DatabaseHelper {
     final db = await instance.database;
     db.close();
   }
+
+  /// Deletes a work day and all associated sessions, tasks, and task photos
+  Future<void> deleteDayCascade(int workDayId) async {
+    final db = await instance.database;
+
+    // Get all task IDs for this day
+    final taskMaps = await db.query(
+      'tasks',
+      columns: ['id'],
+      where: 'work_day_id = ?',
+      whereArgs: [workDayId],
+    );
+
+    // Delete task photos for each task
+    for (final task in taskMaps) {
+      await db.delete(
+        'task_photos',
+        where: 'task_id = ?',
+        whereArgs: [task['id']],
+      );
+    }
+
+    // Delete tasks
+    await db.delete(
+      'tasks',
+      where: 'work_day_id = ?',
+      whereArgs: [workDayId],
+    );
+
+    // Delete sessions
+    await db.delete(
+      'sessions',
+      where: 'work_day_id = ?',
+      whereArgs: [workDayId],
+    );
+
+    // Delete the work day
+    await db.delete(
+      'work_days',
+      where: 'id = ?',
+      whereArgs: [workDayId],
+    );
+  }
 }
