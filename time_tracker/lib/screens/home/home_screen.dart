@@ -109,7 +109,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
     final photoPath = result == 'skip' ? null : result;
     final location = await LocationUtils.getCurrentLocation();
     if (!context.mounted) return;
-    final taskResult = await showDialog<Map<String, String>>(
+
+    // Wait for the push pop animation to fully complete
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    if (!context.mounted) return;
+    final taskResult = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const TaskNameDialog(),
