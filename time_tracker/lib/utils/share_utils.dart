@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/work_day.dart';
 import '../models/task.dart';
+import '../models/session.dart';
 import 'time_utils.dart';
 
 class ShareUtils {
@@ -13,6 +14,7 @@ class ShareUtils {
   static String buildTextSummary({
     required WorkDay day,
     required List<Task> tasks,
+    required List<Session> sessions,
     required String workerName,
   }) {
     final buffer = StringBuffer();
@@ -21,15 +23,19 @@ class ShareUtils {
     buffer.writeln('Date:    ${TimeUtils.formatDate(day.date)}');
     buffer.writeln('');
 
-    if (day.clockInTime != null)
-      buffer.writeln('⏰ Clock In:   ${TimeUtils.formatTime(day.clockInTime!)}');
-    if (day.clockOutTime != null)
-      buffer.writeln('⏰ Clock Out:  ${TimeUtils.formatTime(day.clockOutTime!)}');
+    for (int i = 0; i < sessions.length; i++) {
+      final s = sessions[i];
+      buffer.writeln(
+          '⏰ Session ${i + 1}:  ${TimeUtils.formatTime(s.clockInTime)} → ${s.clockOutTime != null ? TimeUtils.formatTime(s.clockOutTime!) : 'Active'}  (${TimeUtils.formatDuration(s.duration)})');
+    }
+
     if (day.clockInLocation != null)
       buffer.writeln('📍 Location:  ${day.clockInLocation}');
 
-    final taskTotal = tasks.fold(0, (s, t) => s + t.durationMinutesRounded);
-    buffer.writeln('⏱  Task Hours: ${TimeUtils.formatDuration(Duration(minutes: taskTotal))}');
+    final taskTotal =
+        tasks.fold(0, (s, t) => s + t.durationMinutesRounded);
+    buffer.writeln(
+        '⏱  Task Hours: ${TimeUtils.formatDuration(Duration(minutes: taskTotal))}');
     buffer.writeln('');
     buffer.writeln('─────────────────────────');
     buffer.writeln('TASKS');
@@ -59,29 +65,42 @@ class ShareUtils {
   static Future<void> shareText({
     required WorkDay day,
     required List<Task> tasks,
+    required List<Session> sessions,
     required String workerName,
   }) async {
     final text = buildTextSummary(
-        day: day, tasks: tasks, workerName: workerName);
-    await Share.share(text, subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}');
+      day: day,
+      tasks: tasks,
+      sessions: sessions,
+      workerName: workerName,
+    );
+    await Share.share(text,
+        subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}');
   }
 
   /// Share text + all photos
   static Future<void> shareWithPhotos({
     required WorkDay day,
     required List<Task> tasks,
+    required List<Session> sessions,
     required String workerName,
     required BuildContext context,
   }) async {
     final text = buildTextSummary(
-        day: day, tasks: tasks, workerName: workerName);
+      day: day,
+      tasks: tasks,
+      sessions: sessions,
+      workerName: workerName,
+    );
 
     final List<XFile> files = [];
 
-    // Collect clock in/out photos
-    for (final path in [day.clockInPhoto, day.clockOutPhoto]) {
-      if (path != null && File(path).existsSync()) {
-        files.add(XFile(path));
+    // Collect session photos
+    for (final s in sessions) {
+      for (final path in [s.clockInPhoto, s.clockOutPhoto]) {
+        if (path != null && File(path).existsSync()) {
+          files.add(XFile(path));
+        }
       }
     }
 
@@ -96,12 +115,14 @@ class ShareUtils {
 
     if (files.isEmpty) {
       await Share.share(text,
-          subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}');
+          subject:
+              'Work Summary — ${TimeUtils.formatDate(day.date)}');
     } else {
       await Share.shareXFiles(
         files,
         text: text,
-        subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}',
+        subject:
+            'Work Summary — ${TimeUtils.formatDate(day.date)}',
       );
     }
   }
@@ -110,6 +131,7 @@ class ShareUtils {
   static Future<void> sharePdf({
     required WorkDay day,
     required List<Task> tasks,
+    required List<Session> sessions,
     required String workerName,
   }) async {
     final pdf = pw.Document();
@@ -131,7 +153,8 @@ class ShareUtils {
               children: [
                 pw.Text('DAILY WORK SUMMARY',
                     style: pw.TextStyle(
-                        fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
                 pw.Text('Worker: $workerName'),
                 pw.Text('Date: ${TimeUtils.formatDate(day.date)}'),
@@ -140,62 +163,37 @@ class ShareUtils {
           ),
           pw.SizedBox(height: 16),
 
-          // Clock in/out
-          pw.Row(children: [
-            if (day.clockInTime != null)
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+          // Sessions
+          pw.Text('ON SITE',
+              style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey700)),
+          pw.Divider(),
+
+          ...sessions.map((s) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 4),
+                child: pw.Row(
+                  mainAxisAlignment:
+                      pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('CLOCK IN',
-                        style: pw.TextStyle(
-                            fontSize: 9,
-                            color: PdfColors.grey600,
-                            fontWeight: pw.FontWeight.bold)),
-                    pw.Text(TimeUtils.formatTime(day.clockInTime!),
-                        style: pw.TextStyle(
-                            fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  ],
-                ),
-              ),
-            if (day.clockOutTime != null)
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('CLOCK OUT',
-                        style: pw.TextStyle(
-                            fontSize: 9,
-                            color: PdfColors.grey600,
-                            fontWeight: pw.FontWeight.bold)),
-                    pw.Text(TimeUtils.formatTime(day.clockOutTime!),
-                        style: pw.TextStyle(
-                            fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  ],
-                ),
-              ),
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('TOTAL HOURS',
+                    pw.Text(
+                      '${TimeUtils.formatTime(s.clockInTime)} → ${s.clockOutTime != null ? TimeUtils.formatTime(s.clockOutTime!) : 'Active'}',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      TimeUtils.formatDuration(s.duration),
                       style: pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey600,
-                          fontWeight: pw.FontWeight.bold)),
-                  pw.Text(
-                    TimeUtils.formatDuration(Duration(
-                        minutes: tasks.fold(
-                            0, (s, t) => s + t.durationMinutesRounded))),
-                    style: pw.TextStyle(
-                        fontSize: 16, fontWeight: pw.FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ]),
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+              )),
 
           pw.SizedBox(height: 24),
+
+          // Tasks
           pw.Text('TASKS',
               style: pw.TextStyle(
                   fontSize: 11,
@@ -203,42 +201,50 @@ class ShareUtils {
                   color: PdfColors.grey700)),
           pw.Divider(),
 
-          // Task rows
           ...tasks.map((task) => pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 12),
-            padding: const pw.EdgeInsets.all(10),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey200),
-              borderRadius: pw.BorderRadius.circular(6),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                margin: const pw.EdgeInsets.only(bottom: 12),
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey200),
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text(task.name,
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    pw.Text(TimeUtils.formatDuration(task.durationRounded),
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Row(
+                      mainAxisAlignment:
+                          pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(task.name,
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                            TimeUtils.formatDuration(
+                                task.durationRounded),
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                        '${TimeUtils.formatTime(task.startTime)} → ${task.endTime != null ? TimeUtils.formatTime(task.endTime!) : 'In progress'}',
+                        style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey600)),
+                    if (task.startLocation != null)
+                      pw.Text('📍 ${task.startLocation}',
+                          style: const pw.TextStyle(
+                              fontSize: 9,
+                              color: PdfColors.grey500)),
+                    if (task.notes != null &&
+                        task.notes!.isNotEmpty)
+                      pw.Text('Notes: ${task.notes}',
+                          style: const pw.TextStyle(
+                              fontSize: 10,
+                              color: PdfColors.grey700)),
                   ],
                 ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                    '${TimeUtils.formatTime(task.startTime)} → ${task.endTime != null ? TimeUtils.formatTime(task.endTime!) : 'In progress'}',
-                    style: const pw.TextStyle(
-                        fontSize: 10, color: PdfColors.grey600)),
-                if (task.startLocation != null)
-                  pw.Text('📍 ${task.startLocation}',
-                      style: const pw.TextStyle(
-                          fontSize: 9, color: PdfColors.grey500)),
-                if (task.notes != null && task.notes!.isNotEmpty)
-                  pw.Text('Notes: ${task.notes}',
-                      style: const pw.TextStyle(
-                          fontSize: 10, color: PdfColors.grey700)),
-              ],
-            ),
-          )),
+              )),
 
           pw.SizedBox(height: 16),
           pw.Divider(),
@@ -261,7 +267,8 @@ class ShareUtils {
 
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'Work Summary — ${TimeUtils.formatDate(day.date)}',
+      subject:
+          'Work Summary — ${TimeUtils.formatDate(day.date)}',
     );
   }
 
@@ -270,11 +277,9 @@ class ShareUtils {
     final buffer = StringBuffer();
     buffer.writeln('🔨 TASK SUMMARY');
     buffer.writeln('Task:     ${task.name}');
-    buffer.writeln(
-        'Start:    ${TimeUtils.formatTime(task.startTime)}');
+    buffer.writeln('Start:    ${TimeUtils.formatTime(task.startTime)}');
     if (task.endTime != null)
-      buffer.writeln(
-          'End:      ${TimeUtils.formatTime(task.endTime!)}');
+      buffer.writeln('End:      ${TimeUtils.formatTime(task.endTime!)}');
     buffer.writeln(
         'Duration: ${TimeUtils.formatDuration(task.durationRounded)}');
     if (task.startLocation != null)

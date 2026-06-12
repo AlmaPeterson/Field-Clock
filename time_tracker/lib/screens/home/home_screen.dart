@@ -15,6 +15,7 @@ import '../task/task_detail_screen.dart';
 import '../jobs/jobs_screen.dart';
 import '../../database/dao/job_dao.dart';
 import 'package:flutter/scheduler.dart';
+import '../../widgets/session_edit_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -216,8 +217,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
                 provider: provider,
                 onClockIn: () => _handleClockIn(context, provider),
                 onClockOut: () => _handleClockOut(context, provider),
-                onResetClockIn: () => provider.resetClockIn(),
-                onResetClockOut: () => provider.resetClockOut(),
               ),
               const SizedBox(height: 16),
               if (provider.isClockedIn && !provider.today!.isComplete) ...[
@@ -270,22 +269,77 @@ class _ClockCard extends StatelessWidget {
   final WorkDayProvider provider;
   final VoidCallback onClockIn;
   final VoidCallback onClockOut;
-  final VoidCallback onResetClockIn;
-  final VoidCallback onResetClockOut;
 
   const _ClockCard({
     required this.provider,
     required this.onClockIn,
     required this.onClockOut,
-    required this.onResetClockIn,
-    required this.onResetClockOut,
   });
+
+  Future<void> _handleUndo(
+      BuildContext context, WorkDayProvider provider) async {
+    final isClockedIn = provider.isClockedIn;
+    final hasCompletedSessions = provider.todaySessions
+        .any((s) => !s.isActive);
+
+    final message = isClockedIn
+        ? 'Cancel this clock-in? Any active task will be lost.'
+        : hasCompletedSessions
+            ? 'Undo your last clock-out? You will be clocked back in.'
+            : 'Delete today\'s record entirely? This cannot be undone.';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        title: Text(
+          isClockedIn ? 'Cancel Clock-In?' : 'Undo Clock-Out?',
+          style: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyLarge
+                  ?.color),
+        ),
+        content: Text(message,
+            style: TextStyle(
+                color: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.color)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Confirm',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    if (isClockedIn) {
+      await provider.cancelActiveSession();
+    } else if (hasCompletedSessions) {
+      await provider.undoClockOut();
+    } else {
+      await provider.resetDay();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final today = provider.today;
     final isClockedIn = provider.isClockedIn;
-    final isComplete = today?.isComplete ?? false;
+    final sessions = provider.todaySessions;
+    final totalMinutes = provider.totalSessionMinutes;
 
     return Card(
       child: Padding(
@@ -293,6 +347,7 @@ class _ClockCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Status row
             Row(
               children: [
                 Container(
@@ -301,10 +356,10 @@ class _ClockCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: isClockedIn
                         ? AppColors.success
-                        : isComplete
-                            ? provider.today != null
-                                ? Theme.of(context).colorScheme.primary
-                                : AppColors.success
+                        : today != null
+                            ? Theme.of(context)
+                                .colorScheme
+                                .primary
                             : Colors.grey,
                   ),
                 ),
@@ -312,127 +367,211 @@ class _ClockCard extends StatelessWidget {
                 Text(
                   isClockedIn
                       ? 'CLOCKED IN'
-                      : isComplete
-                          ? 'DAY COMPLETE'
+                      : today != null
+                          ? 'CLOCKED OUT'
                           : 'NOT CLOCKED IN',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: isClockedIn
-                        ? AppColors.success
-                        : isComplete
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.grey,
-                  ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(
+                        color: isClockedIn
+                            ? AppColors.success
+                            : today != null
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                : Colors.grey,
+                      ),
                 ),
                 const Spacer(),
-                // Reset clock-in button
-                if (today != null && !isComplete)
+                // Undo button — show whenever there's a today record
+                if (today != null)
                   IconButton(
                     icon: const Icon(Icons.undo, size: 18),
                     tooltip: isClockedIn
-                        ? 'Undo Clock In'
-                        : 'Undo Clock Out',
-                    color: AppColors.error,
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          backgroundColor:
-                              Theme.of(context).cardColor,
-                          title: Text(
-                            isClockedIn
-                                ? 'Undo Clock In?'
-                                : 'Undo Clock Out?',
-                            style: TextStyle(
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.color),
-                          ),
-                          content: Text(
-                            isClockedIn
-                                ? 'This will delete today\'s clock-in and all tasks. Cannot be undone.'
-                                : 'This will remove your clock-out time.',
-                            style: TextStyle(
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.color),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, true),
-                              child: Text('Confirm',
-                                  style: TextStyle(
-                                      color: AppColors.error)),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        if (isClockedIn) {
-                          onResetClockIn();
-                        } else {
-                          onResetClockOut();
-                        }
-                      }
-                    },
+                        ? 'Cancel clock-in'
+                        : 'Undo clock-out',
+                    color: Theme.of(context).colorScheme.error,
+                    onPressed: () =>
+                        _handleUndo(context, provider),
                   ),
               ],
             ),
             const SizedBox(height: 12),
-            if (today?.clockInTime != null)
-              _TimePhotoRow(
-                label: 'In',
-                time: TimeUtils.formatTime(today!.clockInTime!),
-                photoPath: today.clockInPhoto,
-              ),
-            if (today?.clockOutTime != null) ...[
-              const SizedBox(height: 8),
-              _TimePhotoRow(
-                label: 'Out',
-                time: TimeUtils.formatTime(today!.clockOutTime!),
-                photoPath: today.clockOutPhoto,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Total: ${TimeUtils.formatDuration(today.totalDurationRounded)}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            if (!isComplete) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: Icon(isClockedIn
-                      ? Icons.logout
-                      : Icons.login),
-                  label: Text(
-                      isClockedIn ? 'Clock Out' : 'Clock In'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isClockedIn
-                        ? AppColors.error
-                        : Theme.of(context).colorScheme.primary,
+
+            // Session list
+            if (sessions.isNotEmpty) ...[
+              ...sessions.map((s) => GestureDetector(
+                onTap: () async {
+                  final result =
+                      await showDialog<Map<String, DateTime?>>(
+                    context: context,
+                    builder: (_) =>
+                        SessionEditDialog(session: s),
+                  );
+                  if (result == null) return;
+                  await context
+                      .read<WorkDayProvider>()
+                      .editSessionTime(
+                        session: s,
+                        newClockIn: result['clockIn'],
+                        newClockOut: result['clockOut'],
+                      );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .dividerColor
+                        .withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  onPressed:
-                      isClockedIn ? onClockOut : onClockIn,
+                  child: Row(
+                    children: [
+                      if (s.clockInPhoto != null)
+                        _MiniPhoto(path: s.clockInPhoto!)
+                      else
+                        const _MiniPhotoPlaceholder(),
+                      const SizedBox(width: 8),
+                      Text(
+                        TimeUtils.formatTime(s.clockInTime),
+                        style:
+                            Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Text('  →  ',
+                          style: TextStyle(color: Colors.grey)),
+                      if (s.isActive)
+                        Text('Now',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w600,
+                            ))
+                      else ...[
+                        if (s.clockOutPhoto != null)
+                          _MiniPhoto(path: s.clockOutPhoto!)
+                        else
+                          const _MiniPhotoPlaceholder(),
+                        const SizedBox(width: 8),
+                        Text(
+                          TimeUtils.formatTime(s.clockOutTime!),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium,
+                        ),
+                        const Spacer(),
+                        Text(
+                          TimeUtils.formatDuration(s.duration),
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(Icons.edit,
+                            size: 12,
+                            color: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.color),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+              )),
+
+              // Total
+              if (sessions.length > 1 ||
+                  sessions.any((s) => !s.isActive)) ...[
+                Divider(
+                    color: Theme.of(context).dividerColor),
+                Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total on site',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium),
+                    Text(
+                      TimeUtils.formatDuration(Duration(
+                          minutes: totalMinutes)),
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
             ],
+
+            // Clock in / out button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: Icon(
+                    isClockedIn ? Icons.logout : Icons.login),
+                label: Text(
+                    isClockedIn ? 'Clock Out' : 'Clock In'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isClockedIn
+                      ? AppColors.error
+                      : Theme.of(context)
+                          .colorScheme
+                          .primary,
+                ),
+                onPressed:
+                    isClockedIn ? onClockOut : onClockIn,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class _MiniPhoto extends StatelessWidget {
+  final String path;
+  const _MiniPhoto({required this.path});
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.file(
+          File(path),
+          width: 28,
+          height: 28,
+          fit: BoxFit.cover,
+        ),
+      );
+}
+
+class _MiniPhotoPlaceholder extends StatelessWidget {
+  const _MiniPhotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: Theme.of(context).dividerColor,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(Icons.camera_alt,
+            size: 14,
+            color: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.color),
+      );
 }
 
 // ── Task Action Card ─────────────────────────────────────────────────────────

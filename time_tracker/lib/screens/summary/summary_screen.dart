@@ -8,6 +8,8 @@ import '../../utils/share_utils.dart';
 import '../../database/dao/task_dao.dart';
 import '../task/task_detail_screen.dart';
 import '../../utils/share_utils.dart';
+import '../../models/session.dart';
+import '../../database/dao/session_dao.dart';
 
 class SummaryScreen extends StatefulWidget {
   final WorkDay day;
@@ -24,6 +26,7 @@ class SummaryScreen extends StatefulWidget {
 }
 
 class _SummaryScreenState extends State<SummaryScreen> {
+  List<Session> _sessions = [];
   List<Task> _tasks = [];
   bool _loading = true;
 
@@ -36,8 +39,11 @@ class _SummaryScreenState extends State<SummaryScreen> {
   Future<void> _load() async {
     if (widget.day.id == null) return;
     final tasks = await TaskDao().getByWorkDay(widget.day.id!);
+    final sessions =
+        await SessionDao().getByWorkDay(widget.day.id!);
     setState(() {
       _tasks = tasks;
+      _sessions = sessions;
       _loading = false;
     });
   }
@@ -70,6 +76,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 ShareUtils.shareText(
                   day: widget.day,
                   tasks: _tasks,
+                  sessions: _sessions,
                   workerName: widget.workerName,
                 );
               },
@@ -84,6 +91,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 ShareUtils.shareWithPhotos(
                   day: widget.day,
                   tasks: _tasks,
+                  sessions: _sessions,
                   workerName: widget.workerName,
                   context: context,
                 );
@@ -99,6 +107,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 ShareUtils.sharePdf(
                   day: widget.day,
                   tasks: _tasks,
+                  sessions: _sessions,
                   workerName: widget.workerName,
                 );
               },
@@ -138,7 +147,12 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 const SizedBox(height: 16),
 
                 // Clock in/out card
-                _DayOverviewCard(day: day, totalMinutes: _totalMinutes),
+                _DayOverviewCard(
+                  day: widget.day,
+                  totalMinutes: _totalMinutes,
+                  sessions: _sessions,
+                  taskCount: _tasks.where((t) => t.isComplete).length,
+                ),
                 const SizedBox(height: 16),
 
                 // Tasks
@@ -173,8 +187,15 @@ class _SummaryScreenState extends State<SummaryScreen> {
 class _DayOverviewCard extends StatelessWidget {
   final WorkDay day;
   final int totalMinutes;
+  final List<Session> sessions;
+  final int taskCount;
 
-  const _DayOverviewCard({required this.day, required this.totalMinutes});
+  const _DayOverviewCard({
+    required this.day,
+    required this.totalMinutes,
+    required this.sessions,
+    required this.taskCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,42 +203,86 @@ class _DayOverviewCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top stats
             Row(
               children: [
                 _StatBlock(
-                  label: 'CLOCK IN',
-                  value: day.clockInTime != null
-                      ? TimeUtils.formatTime(day.clockInTime!)
-                      : '—',
-                  photo: day.clockInPhoto,
-                ),
-                _StatBlock(
-                  label: 'CLOCK OUT',
-                  value: day.clockOutTime != null
-                      ? TimeUtils.formatTime(day.clockOutTime!)
-                      : '—',
-                  photo: day.clockOutPhoto,
-                ),
-                _StatBlock(
-                  label: 'TASK HOURS',
+                  label: 'ON SITE',
                   value: TimeUtils.formatDuration(
                       Duration(minutes: totalMinutes)),
                   highlight: true,
                 ),
+                _StatBlock(
+                  label: 'SESSIONS',
+                  value: '${sessions.length}',
+                ),
+                _StatBlock(
+                  label: 'TASKS',
+                  value: '$taskCount',
+                ),
               ],
             ),
-            if (day.clockInLocation != null) ...[
+            if (sessions.isNotEmpty) ...[
               const SizedBox(height: 12),
+              Divider(color: Theme.of(context).dividerColor),
+              const SizedBox(height: 8),
+              ...sessions.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Text(
+                          TimeUtils.formatTime(s.clockInTime),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium,
+                        ),
+                        const Text('  →  ',
+                            style: TextStyle(
+                                color: Colors.grey)),
+                        Text(
+                          s.clockOutTime != null
+                              ? TimeUtils.formatTime(
+                                  s.clockOutTime!)
+                              : 'Active',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium,
+                        ),
+                        const Spacer(),
+                        Text(
+                          TimeUtils.formatDuration(
+                              s.duration),
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+            if (day.clockInLocation != null) ...[
+              const SizedBox(height: 8),
               Divider(color: Theme.of(context).dividerColor),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Icon(Icons.location_on,
-                      size: 14, color: Theme.of(context).textTheme.bodyMedium!.color!),
+                      size: 14,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color),
                   const SizedBox(width: 4),
                   Text(day.clockInLocation!,
-                      style: Theme.of(context).textTheme.bodyMedium),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium),
                 ],
               ),
             ],

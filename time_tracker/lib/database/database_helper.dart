@@ -18,9 +18,29 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          work_day_id INTEGER NOT NULL,
+          clock_in_time TEXT NOT NULL,
+          clock_in_photo TEXT,
+          clock_in_location TEXT,
+          clock_out_time TEXT,
+          clock_out_photo TEXT,
+          clock_out_location TEXT,
+          duration_minutes INTEGER DEFAULT 0,
+          FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+        )
+      ''');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -63,6 +83,21 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE TABLE sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        work_day_id INTEGER NOT NULL,
+        clock_in_time TEXT NOT NULL,
+        clock_in_photo TEXT,
+        clock_in_location TEXT,
+        clock_out_time TEXT,
+        clock_out_photo TEXT,
+        clock_out_location TEXT,
+        duration_minutes INTEGER DEFAULT 0,
+        FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+      )
+    ''');
+
+    await db.execute('''
       CREATE TABLE tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         work_day_id INTEGER NOT NULL,
@@ -77,7 +112,7 @@ class DatabaseHelper {
         duration_minutes_raw INTEGER DEFAULT 0,
         duration_minutes_rounded INTEGER DEFAULT 0,
         hourly_rate REAL DEFAULT 0.0,
-        FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+        FOREIGN KEY (work_day_id) REFERENCES tasks(id)
       )
     ''');
   }
