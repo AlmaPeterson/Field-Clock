@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/theme_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/prefs_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -25,23 +25,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    _nameController.text = prefs.getString('worker_name') ?? '';
-    _rateController.text =
-        (prefs.getDouble('hourly_rate') ?? 0.0).toString();
-    _rounding = prefs.getString('rounding') ?? '15';
-    _showEarnings = prefs.getBool('show_earnings') ?? false;
+    _nameController.text = await PrefsUtils.getWorkerName();
+    _rateController.text = (await PrefsUtils.getHourlyRate()).toString();
+    _rounding = await PrefsUtils.getRounding();
+    _showEarnings = await PrefsUtils.getShowEarnings();
     setState(() => _loading = false);
   }
 
   Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        'worker_name', _nameController.text.trim());
-    await prefs.setDouble(
-        'hourly_rate', double.tryParse(_rateController.text) ?? 0.0);
-    await prefs.setString('rounding', _rounding);
-    await prefs.setBool('show_earnings', _showEarnings);
+    await PrefsUtils.setWorkerName(_nameController.text.trim());
+    await PrefsUtils.setHourlyRate(
+        double.tryParse(_rateController.text) ?? 0.0);
+    await PrefsUtils.setRounding(_rounding);
+    await PrefsUtils.setShowEarnings(_showEarnings);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings saved')),
@@ -228,25 +224,21 @@ class _SectionHeader extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   final String label;
   final Widget child;
-  _SettingsTile({required this.label, required this.child});
+  const _SettingsTile({required this.label, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>().theme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: theme.onSurface)),
+              style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 12),
           child,
         ],

@@ -2,12 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';
-import '../../theme/app_theme.dart';
 import '../../utils/time_utils.dart';
 import '../../utils/share_utils.dart';
 import '../../database/dao/task_dao.dart';
 import '../task/task_detail_screen.dart';
-import '../../utils/share_utils.dart';
 import '../../models/session.dart';
 import '../../database/dao/session_dao.dart';
 import '../history/edit_day_screen.dart';
@@ -244,8 +242,11 @@ class _SummaryScreenState extends State<SummaryScreen> {
                     style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 12),
 
-                ..._tasks
-                  .map((t) => _TaskDetailCard(task: t, onEdited: _load)),
+                ..._tasks.map((t) => _TaskDetailCard(
+                  task: t,
+                  sessions: _taskSessionsMap[t.id ?? 0] ?? [],
+                  onEdited: _load,
+                )),
 
                 const SizedBox(height: 24),
 
@@ -469,42 +470,20 @@ class _StatBlock extends StatelessWidget {
 
 // ── Task Detail Card ─────────────────────────────────────────────────────────
 
-class _TaskDetailCard extends StatefulWidget {
+class _TaskDetailCard extends StatelessWidget {
   final Task task;
+  final List<TaskSession> sessions;
   final VoidCallback? onEdited;
 
-  const _TaskDetailCard(
-      {required this.task, this.onEdited});
+  const _TaskDetailCard({
+    required this.task,
+    required this.sessions,
+    this.onEdited,
+  });
 
-  @override
-  State<_TaskDetailCard> createState() =>
-      _TaskDetailCardState();
-}
-
-class _TaskDetailCardState
-    extends State<_TaskDetailCard> {
-  List<TaskSession> _sessions = [];
-  int _totalMinutes = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (widget.task.id == null) return;
-    final sessions = await TaskSessionDao()
-        .getByTask(widget.task.id!);
-    final total = sessions
-        .where((s) => !s.isActive)
-        .fold(0,
-            (sum, s) => sum + s.durationMinutesRounded);
-    setState(() {
-      _sessions = sessions;
-      _totalMinutes = total;
-    });
-  }
+  int get _totalMinutes => sessions
+      .where((s) => !s.isActive)
+      .fold<int>(0, (sum, s) => sum + s.durationMinutesRounded);
 
   @override
   Widget build(BuildContext context) {
@@ -522,11 +501,10 @@ class _TaskDetailCardState
             context,
             MaterialPageRoute(
                 builder: (_) => TaskDetailScreen(
-                    task: widget.task)),
+                    task: task)),
           );
           if (edited == true) {
-            await _load();
-            widget.onEdited?.call();
+            onEdited?.call();
           }
         },
         child: Padding(
@@ -543,15 +521,15 @@ class _TaskDetailCardState
                       crossAxisAlignment:
                           CrossAxisAlignment.start,
                       children: [
-                        Text(widget.task.name,
+                        Text(task.name,
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium),
-                        if (widget.task.division !=
+                        if (task.division !=
                             null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            widget.task.division!,
+                            task.division!,
                             style: TextStyle(
                               color: primary,
                               fontSize: 12,
@@ -572,8 +550,8 @@ class _TaskDetailCardState
                         const BoxConstraints(),
                     onPressed: () =>
                         ShareUtils.shareTask(
-                            task: widget.task,
-                            sessions: _sessions),
+                            task: task,
+                            sessions: sessions),
                   ),
                   const SizedBox(width: 8),
                   Container(
@@ -600,14 +578,14 @@ class _TaskDetailCardState
               ),
 
               // Sessions breakdown
-              if (_sessions.isNotEmpty) ...[
+              if (sessions.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Divider(
                     height: 1,
                     color:
                         Theme.of(context).dividerColor),
                 const SizedBox(height: 8),
-                ..._sessions
+                ...sessions
                     .where((s) => !s.isActive)
                     .map((s) => Padding(
                           padding:
@@ -651,8 +629,7 @@ class _TaskDetailCardState
               ],
 
               // Location
-              if (widget.task.startLocation !=
-                  null) ...[
+              if (task.startLocation != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -661,7 +638,7 @@ class _TaskDetailCardState
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                          widget.task.startLocation!,
+                          task.startLocation!,
                           style: TextStyle(
                               color: muted,
                               fontSize: 12)),
@@ -671,8 +648,8 @@ class _TaskDetailCardState
               ],
 
               // Notes
-              if (widget.task.notes != null &&
-                  widget.task.notes!.isNotEmpty) ...[
+              if (task.notes != null &&
+                  task.notes!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
@@ -683,7 +660,7 @@ class _TaskDetailCardState
                     borderRadius:
                         BorderRadius.circular(8),
                   ),
-                  child: Text(widget.task.notes!,
+                  child: Text(task.notes!,
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium),

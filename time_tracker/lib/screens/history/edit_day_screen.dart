@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../database/dao/work_day_dao.dart';
 import '../../database/dao/session_dao.dart';
 import '../../database/dao/task_dao.dart';
@@ -13,11 +12,10 @@ import '../../models/task_photo.dart';
 import '../../models/job.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/time_utils.dart';
-import '../../utils/divisions.dart';
 import '../task/task_detail_screen.dart';
-import 'dart:io';
 import '../../models/task_session.dart';
 import '../../database/dao/task_session_dao.dart';
+import '../../widgets/task_entry_card.dart';
 
 class EditDayScreen extends StatefulWidget {
   final WorkDay day;
@@ -34,7 +32,7 @@ class _EditDayScreenState extends State<EditDayScreen> {
   List<Session> _existingSessions = [];
   List<Task> _existingTasks = [];
   final List<_NewSessionEntry> _newSessions = [];
-  final List<_NewTaskEntry> _newTasks = [];
+  final List<TaskEntryData> _newTasks = [];
   List<Job> _jobs = [];
   Job? _selectedJob;
   bool _saving = false;
@@ -175,20 +173,6 @@ class _EditDayScreenState extends State<EditDayScreen> {
     setState(() => _saving = true);
 
     try {
-      // Update work day date and job
-      final updatedDay = WorkDay(
-        id: widget.day.id,
-        jobId: _selectedJob?.id,
-        date: _selectedDate,
-        clockInTime: widget.day.clockInTime,
-        clockInPhoto: widget.day.clockInPhoto,
-        clockInLocation: widget.day.clockInLocation,
-        totalMinutesRaw: widget.day.totalMinutesRaw,
-        totalMinutesRounded:
-            widget.day.totalMinutesRounded,
-      );
-      await WorkDayDao().update(updatedDay);
-
       // Save new sessions
       for (final s in _newSessions) {
         if (s.clockIn == null) continue;
@@ -211,62 +195,56 @@ class _EditDayScreenState extends State<EditDayScreen> {
         ));
       }
 
-      // Recalculate day totals from all sessions
+      // Recalculate and save day with updated date, job, and totals
       final allSessions = await _sessionDao
           .getByWorkDay(widget.day.id!);
       final totalMinutes = allSessions
           .where((s) => !s.isActive)
-          .fold(0, (sum, s) => sum + s.durationMinutes);
+          .fold<int>(0, (sum, s) => sum + s.durationMinutes);
 
       await WorkDayDao().update(WorkDay(
         id: widget.day.id,
         jobId: _selectedJob?.id,
         date: _selectedDate,
         clockInTime: widget.day.clockInTime,
+        clockInPhoto: widget.day.clockInPhoto,
+        clockInLocation: widget.day.clockInLocation,
         totalMinutesRaw: totalMinutes,
         totalMinutesRounded: totalMinutes,
       ));
 
       // Save new tasks
       for (final t in _newTasks) {
-        if (t.startTime == null) continue;
-        final startTime =
-            _toDateTime(_selectedDate, t.startTime!);
-        final endTime = t.endTime != null
-            ? _toDateTime(_selectedDate, t.endTime!)
-            : null;
-        int rawMin = 0;
-        int roundedMin = 0;
-        if (endTime != null) {
-          final raw = endTime.difference(startTime);
-          rawMin = raw.inMinutes;
-          roundedMin =
-              TimeUtils.roundToNearest15(raw).inMinutes;
-        }
+        final validTimes =
+            t.times.where((e) => e.startTime != null).toList();
+        if (validTimes.isEmpty) continue;
         final task = Task(
           workDayId: widget.day.id!,
           name: t.name.isEmpty ? 'Unnamed Task' : t.name,
           division: t.division,
           notes: t.notes,
-          startTime: startTime,
+          startTime: _toDateTime(_selectedDate, validTimes.first.startTime!),
         );
         final taskId = await _taskDao.insert(task);
 
-        // Insert as a task session
-        if (t.endTime != null) {
-          final endDt =
-              _toDateTime(_selectedDate, t.endTime!);
-          final raw = endDt.difference(startTime).inMinutes;
-          final rounded =
-              TimeUtils.roundToNearest15(
-                      Duration(minutes: raw))
-                  .inMinutes;
+        for (final te in validTimes) {
+          final startTime = _toDateTime(_selectedDate, te.startTime!);
+          final endTime = te.endTime != null
+              ? _toDateTime(_selectedDate, te.endTime!)
+              : null;
+          int rawMin = 0;
+          int roundedMin = 0;
+          if (endTime != null) {
+            final raw = endTime.difference(startTime);
+            rawMin = raw.inMinutes;
+            roundedMin = TimeUtils.roundToNearest15(raw).inMinutes;
+          }
           await TaskSessionDao().insert(TaskSession(
             taskId: taskId,
             startTime: startTime,
-            endTime: endDt,
-            durationMinutesRaw: raw,
-            durationMinutesRounded: rounded,
+            endTime: endTime,
+            durationMinutesRaw: rawMin,
+            durationMinutesRounded: roundedMin,
           ));
         }
 
@@ -544,7 +522,7 @@ class _EditDayScreenState extends State<EditDayScreen> {
 
           // New tasks
           ..._newTasks.asMap().entries.map((e) =>
-              _NewTaskEntryCard(
+              TaskEntryCard(
                 index: e.key,
                 entry: e.value,
                 onRemove: () => setState(
@@ -565,7 +543,7 @@ class _EditDayScreenState extends State<EditDayScreen> {
             ),
             onPressed: () =>
                 setState(() => _newTasks
-                    .add(_NewTaskEntry())),
+                    .add(TaskEntryData())),
           ),
           const SizedBox(height: 32),
 
@@ -830,7 +808,7 @@ class _NewSessionCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _TimeTap(
+                  child: TimeTap(
                     label: 'Clock In',
                     time: entry.clockIn,
                     color: AppColors.success,
@@ -840,7 +818,7 @@ class _NewSessionCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _TimeTap(
+                  child: TimeTap(
                     label: 'Clock Out',
                     time: entry.clockOut,
                     color: AppColors.error,
@@ -875,461 +853,6 @@ class _NewSessionCard extends StatelessWidget {
     return TimeUtils.formatDuration(
         TimeUtils.roundToNearest15(
             Duration(minutes: diff)));
-  }
-}
-
-// ── New task entry (reuses same structure as PastDayEntryScreen) ──────────────
-
-class _NewTaskEntry {
-  String name = '';
-  String? division;
-  String? notes;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
-  List<_TaskPhotoEntry> photos = [];
-}
-
-class _TaskPhotoEntry {
-  final String path;
-  final String type;
-  _TaskPhotoEntry({required this.path, required this.type});
-}
-
-class _NewTaskEntryCard extends StatefulWidget {
-  final int index;
-  final _NewTaskEntry entry;
-  final VoidCallback onRemove;
-  final VoidCallback onChanged;
-
-  const _NewTaskEntryCard({
-    required this.index,
-    required this.entry,
-    required this.onRemove,
-    required this.onChanged,
-  });
-
-  @override
-  State<_NewTaskEntryCard> createState() =>
-      _NewTaskEntryCardState();
-}
-
-class _NewTaskEntryCardState
-    extends State<_NewTaskEntryCard> {
-  late TextEditingController _nameController;
-  late TextEditingController _notesController;
-  late TextEditingController _divisionController;
-  List<String> _filteredDivisions = Divisions.all;
-  bool _showDivisionList = false;
-  final _picker = ImagePicker();
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController =
-        TextEditingController(text: widget.entry.name);
-    _notesController = TextEditingController(
-        text: widget.entry.notes ?? '');
-    _divisionController = TextEditingController(
-        text: widget.entry.division ?? '');
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _notesController.dispose();
-    _divisionController.dispose();
-    super.dispose();
-  }
-
-  void _filterDivisions(String query) {
-    setState(() {
-      _filteredDivisions = query.isEmpty
-          ? Divisions.all
-          : Divisions.all
-              .where((d) => d
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
-              .toList();
-    });
-  }
-
-  Future<void> _pickTime(bool isStart) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: isStart
-          ? (widget.entry.startTime ??
-              const TimeOfDay(hour: 8, minute: 0))
-          : (widget.entry.endTime ??
-              const TimeOfDay(hour: 9, minute: 0)),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          widget.entry.startTime = picked;
-        } else {
-          widget.entry.endTime = picked;
-        }
-      });
-      widget.onChanged();
-    }
-  }
-
-  Future<void> _addPhoto(String type) async {
-    final source =
-        await _showPhotoSourceDialog(context);
-    if (source == null) return;
-
-    final XFile? picked = source == 'camera'
-        ? await _picker.pickImage(
-            source: ImageSource.camera,
-            imageQuality: 85)
-        : await _picker.pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 85);
-
-    if (picked == null) return;
-    setState(() => widget.entry.photos.add(
-        _TaskPhotoEntry(
-            path: picked.path, type: type)));
-    widget.onChanged();
-  }
-
-  Future<String?> _showPhotoSourceDialog(
-      BuildContext context) =>
-      showModalBottomSheet<String>(
-        context: context,
-        backgroundColor: Theme.of(context).cardColor,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(16))),
-        builder: (_) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Add Photo',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Icon(Icons.camera_alt,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary),
-                title: const Text('Take Photo'),
-                onTap: () =>
-                    Navigator.pop(context, 'camera'),
-              ),
-              ListTile(
-                leading: Icon(Icons.photo_library,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary),
-                title:
-                    const Text('Upload from Gallery'),
-                onTap: () =>
-                    Navigator.pop(context, 'gallery'),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    final primary =
-        Theme.of(context).colorScheme.primary;
-    final surfaceAlt =
-        Theme.of(context).dividerColor;
-    final bodyColor =
-        Theme.of(context).textTheme.bodyLarge?.color;
-    final mutedColor =
-        Theme.of(context).textTheme.bodyMedium?.color;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
-              children: [
-                Text('New Task',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge),
-                IconButton(
-                  icon: Icon(Icons.close,
-                      size: 16,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .error),
-                  onPressed: widget.onRemove,
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Name
-            TextField(
-              controller: _nameController,
-              style: TextStyle(color: bodyColor),
-              decoration: const InputDecoration(
-                  hintText: 'Task name'),
-              onChanged: (v) {
-                widget.entry.name = v;
-                widget.onChanged();
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // Division
-            if (widget.entry.division != null &&
-                !_showDivisionList)
-              GestureDetector(
-                onTap: () => setState(() {
-                  _showDivisionList = true;
-                  _divisionController.text =
-                      widget.entry.division!;
-                  _filterDivisions(
-                      widget.entry.division!);
-                }),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color:
-                        primary.withOpacity(0.12),
-                    borderRadius:
-                        BorderRadius.circular(10),
-                    border: Border.all(
-                        color:
-                            primary.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                          child: Text(
-                              widget.entry.division!,
-                              style: TextStyle(
-                                  color: primary,
-                                  fontWeight:
-                                      FontWeight.w600))),
-                      Icon(Icons.edit,
-                          size: 14, color: primary),
-                    ],
-                  ),
-                ),
-              )
-            else ...[
-              TextField(
-                controller: _divisionController,
-                style: TextStyle(color: bodyColor),
-                decoration: InputDecoration(
-                  hintText: 'Division (optional)',
-                  prefixIcon: Icon(Icons.search,
-                      color: mutedColor, size: 18),
-                  suffixIcon:
-                      _divisionController.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear,
-                                  color: mutedColor,
-                                  size: 16),
-                              onPressed: () {
-                                _divisionController
-                                    .clear();
-                                _filterDivisions('');
-                                setState(() => widget
-                                    .entry.division =
-                                    null);
-                              },
-                            )
-                          : null,
-                ),
-                onTap: () => setState(
-                    () => _showDivisionList = true),
-                onChanged: (v) {
-                  _filterDivisions(v);
-                  setState(
-                      () => _showDivisionList = true);
-                },
-              ),
-              if (_showDivisionList) ...[
-                const SizedBox(height: 4),
-                Container(
-                  constraints: const BoxConstraints(
-                      maxHeight: 160),
-                  decoration: BoxDecoration(
-                    color: surfaceAlt,
-                    borderRadius:
-                        BorderRadius.circular(10),
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount:
-                        _filteredDivisions.length,
-                    itemBuilder: (context, i) {
-                      final div =
-                          _filteredDivisions[i];
-                      return InkWell(
-                        onTap: () => setState(() {
-                          widget.entry.division =
-                              div;
-                          _showDivisionList = false;
-                          _divisionController.text =
-                              div;
-                          widget.onChanged();
-                        }),
-                        child: Padding(
-                          padding: const EdgeInsets
-                              .symmetric(
-                              horizontal: 14,
-                              vertical: 10),
-                          child: Text(div,
-                              style: TextStyle(
-                                  color: bodyColor,
-                                  fontSize: 13)),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ],
-            const SizedBox(height: 10),
-
-            // Times
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeTap(
-                    label: 'Start',
-                    time: widget.entry.startTime,
-                    color: AppColors.success,
-                    onTap: () => _pickTime(true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TimeTap(
-                    label: 'End',
-                    time: widget.entry.endTime,
-                    color: primary,
-                    onTap: () => _pickTime(false),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Notes
-            TextField(
-              controller: _notesController,
-              style: TextStyle(color: bodyColor),
-              maxLines: 2,
-              decoration: const InputDecoration(
-                  hintText: 'Notes (optional)'),
-              onChanged: (v) {
-                widget.entry.notes = v;
-                widget.onChanged();
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // Photos
-            Row(
-              children: [
-                _PhotoAddBtn(
-                  label: 'Before',
-                  color: AppColors.success,
-                  onTap: () => _addPhoto('before'),
-                ),
-                const SizedBox(width: 6),
-                _PhotoAddBtn(
-                  label: 'After',
-                  color: primary,
-                  onTap: () => _addPhoto('after'),
-                ),
-                const SizedBox(width: 6),
-                _PhotoAddBtn(
-                  label: 'General',
-                  color: Colors.blueGrey,
-                  onTap: () => _addPhoto('general'),
-                ),
-              ],
-            ),
-            if (widget.entry.photos.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 70,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount:
-                      widget.entry.photos.length,
-                  itemBuilder: (context, i) {
-                    final photo =
-                        widget.entry.photos[i];
-                    return Stack(
-                      children: [
-                        Container(
-                          margin: const EdgeInsets
-                              .only(right: 8),
-                          child: ClipRRect(
-                            borderRadius:
-                                BorderRadius.circular(8),
-                            child: Image.file(
-                              File(photo.path),
-                              width: 70,
-                              height: 70,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 2,
-                          right: 10,
-                          child: GestureDetector(
-                            onTap: () => setState(
-                                () => widget.entry
-                                    .photos
-                                    .removeAt(i)),
-                            child: Container(
-                              padding:
-                                  const EdgeInsets
-                                      .all(2),
-                              decoration:
-                                  const BoxDecoration(
-                                color:
-                                    Colors.black54,
-                                shape:
-                                    BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -1409,14 +932,14 @@ class _SessionTimeDialogState
                     .textTheme
                     .labelLarge),
             const SizedBox(height: 20),
-            _TimeTap(
+            TimeTap(
               label: 'Clock In',
               time: _clockIn,
               color: AppColors.success,
               onTap: () => _pick(true),
             ),
             const SizedBox(height: 10),
-            _TimeTap(
+            TimeTap(
               label: 'Clock Out',
               time: _clockOut,
               color: AppColors.error,
@@ -1520,112 +1043,5 @@ class _EmptyHint extends StatelessWidget {
                 .textTheme
                 .bodyMedium,
             textAlign: TextAlign.center),
-      );
-}
-
-class _TimeTap extends StatelessWidget {
-  final String label;
-  final dynamic time; // TimeOfDay or null
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _TimeTap({
-    required this.label,
-    required this.time,
-    required this.color,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final canTap = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: time != null
-              ? color.withOpacity(0.12)
-              : Theme.of(context).dividerColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: time != null && canTap
-                ? color.withOpacity(0.4)
-                : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color,
-                    fontSize: 12)),
-            Text(
-              time != null
-                  ? (time is TimeOfDay
-                      ? time.format(context)
-                      : TimeUtils.formatTime(time))
-                  : 'Tap to set',
-              style: TextStyle(
-                color: time != null && canTap
-                    ? color
-                    : Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PhotoAddBtn extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _PhotoAddBtn({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(
-                  color: color.withOpacity(0.5)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.add_a_photo,
-                    color: color, size: 16),
-                const SizedBox(height: 2),
-                Text(label,
-                    style: TextStyle(
-                        color: color,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        ),
       );
 }

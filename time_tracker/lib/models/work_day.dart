@@ -72,6 +72,7 @@ class WorkDay {
   WorkDay copyWith({
     int? id,
     int? jobId,
+    DateTime? date,
     DateTime? clockInTime,
     String? clockInPhoto,
     String? clockInLocation,
@@ -84,7 +85,7 @@ class WorkDay {
       WorkDay(
         id: id ?? this.id,
         jobId: jobId ?? this.jobId,
-        date: date,
+        date: date ?? this.date,
         clockInTime: clockInTime ?? this.clockInTime,
         clockInPhoto: clockInPhoto ?? this.clockInPhoto,
         clockInLocation:

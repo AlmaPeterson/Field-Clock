@@ -3,7 +3,6 @@ import '../../database/dao/job_dao.dart';
 import '../../database/dao/work_day_dao.dart';
 import '../../database/dao/task_dao.dart';
 import '../../database/dao/session_dao.dart';
-import '../../models/session.dart';
 import '../../models/job.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';

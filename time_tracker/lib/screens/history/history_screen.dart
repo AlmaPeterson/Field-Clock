@@ -3,13 +3,9 @@ import '../../database/dao/work_day_dao.dart';
 import '../../database/dao/task_dao.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';
-import '../../theme/app_theme.dart';
 import '../../utils/time_utils.dart';
-import '../summary/summary_screen.dart';
-import '../../utils/prefs_utils.dart';
 import 'past_day_entry_screen.dart';
 import '../../database/dao/session_dao.dart';
-import '../../models/session.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
