@@ -14,6 +14,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/time_utils.dart';
 import '../../utils/divisions.dart';
 import 'dart:io';
+import '../../models/task_session.dart';
+import '../../database/dao/task_session_dao.dart';
 
 class PastDayEntryScreen extends StatefulWidget {
   const PastDayEntryScreen({super.key});
@@ -193,12 +195,19 @@ class _PastDayEntryScreenState
           division: t.division,
           notes: t.notes,
           startTime: startTime,
-          endTime: endTime,
-          durationMinutesRaw: rawMin,
-          durationMinutesRounded: roundedMin,
         );
         final taskId = await TaskDao().insert(task);
 
+        if (endTime != null) {
+          await TaskSessionDao().insert(TaskSession(
+            taskId: taskId,
+            startTime: startTime,
+            endTime: endTime,
+            durationMinutesRaw: rawMin,
+            durationMinutesRounded: roundedMin,
+          ));
+        }
+        
         // Save photos
         for (final photo in t.photos) {
           await TaskPhotoDao().insert(TaskPhoto(

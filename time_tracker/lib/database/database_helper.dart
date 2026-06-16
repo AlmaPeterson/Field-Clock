@@ -2,7 +2,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper instance = DatabaseHelper._init();
+  static final DatabaseHelper instance =
+      DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
@@ -18,13 +19,14 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  Future _onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS sessions (
@@ -37,15 +39,14 @@ class DatabaseHelper {
           clock_out_photo TEXT,
           clock_out_location TEXT,
           duration_minutes INTEGER DEFAULT 0,
-          FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+          FOREIGN KEY (work_day_id)
+            REFERENCES work_days(id)
         )
       ''');
     }
     if (oldVersion < 3) {
-      // Add division to tasks
       await db.execute(
           'ALTER TABLE tasks ADD COLUMN division TEXT');
-      // Add task_photos table
       await db.execute('''
         CREATE TABLE IF NOT EXISTS task_photos (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +57,46 @@ class DatabaseHelper {
           FOREIGN KEY (task_id) REFERENCES tasks(id)
         )
       ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS task_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          start_time TEXT NOT NULL,
+          start_photo TEXT,
+          end_time TEXT,
+          end_photo TEXT,
+          duration_minutes_raw INTEGER DEFAULT 0,
+          duration_minutes_rounded INTEGER DEFAULT 0,
+          FOREIGN KEY (task_id) REFERENCES tasks(id)
+        )
+      ''');
+      // Migrate existing task start/end into task_sessions
+      final tasks = await db.query('tasks');
+      for (final task in tasks) {
+        if (task['start_time'] != null) {
+          int raw = 0;
+          int rounded = 0;
+          if (task['end_time'] != null) {
+            final start =
+                DateTime.parse(task['start_time'] as String);
+            final end =
+                DateTime.parse(task['end_time'] as String);
+            raw = end.difference(start).inMinutes;
+            rounded = ((raw / 15).round() * 15);
+          }
+          await db.insert('task_sessions', {
+            'task_id': task['id'],
+            'start_time': task['start_time'],
+            'start_photo': task['start_photo'],
+            'end_time': task['end_time'],
+            'end_photo': task['end_photo'],
+            'duration_minutes_raw': raw,
+            'duration_minutes_rounded': rounded,
+          });
+        }
+      }
     }
   }
 
@@ -109,7 +150,8 @@ class DatabaseHelper {
         clock_out_photo TEXT,
         clock_out_location TEXT,
         duration_minutes INTEGER DEFAULT 0,
-        FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+        FOREIGN KEY (work_day_id)
+          REFERENCES work_days(id)
       )
     ''');
 
@@ -121,15 +163,24 @@ class DatabaseHelper {
         division TEXT,
         notes TEXT,
         start_time TEXT NOT NULL,
-        start_photo TEXT,
         start_location TEXT,
+        hourly_rate REAL DEFAULT 0.0,
+        FOREIGN KEY (work_day_id)
+          REFERENCES work_days(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE task_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        start_time TEXT NOT NULL,
+        start_photo TEXT,
         end_time TEXT,
         end_photo TEXT,
-        end_location TEXT,
         duration_minutes_raw INTEGER DEFAULT 0,
         duration_minutes_rounded INTEGER DEFAULT 0,
-        hourly_rate REAL DEFAULT 0.0,
-        FOREIGN KEY (work_day_id) REFERENCES work_days(id)
+        FOREIGN KEY (task_id) REFERENCES tasks(id)
       )
     ''');
 
@@ -145,51 +196,36 @@ class DatabaseHelper {
     ''');
   }
 
-  Future close() async {
-    final db = await instance.database;
-    db.close();
-  }
-
-  /// Deletes a work day and all associated sessions, tasks, and task photos
+  /// Cascade delete a work day and everything under it
   Future<void> deleteDayCascade(int workDayId) async {
     final db = await instance.database;
 
-    // Get all task IDs for this day
-    final taskMaps = await db.query(
-      'tasks',
-      columns: ['id'],
-      where: 'work_day_id = ?',
-      whereArgs: [workDayId],
-    );
+    final taskMaps = await db.query('tasks',
+        columns: ['id'],
+        where: 'work_day_id = ?',
+        whereArgs: [workDayId]);
 
-    // Delete task photos for each task
     for (final task in taskMaps) {
-      await db.delete(
-        'task_photos',
-        where: 'task_id = ?',
-        whereArgs: [task['id']],
-      );
+      await db.delete('task_sessions',
+          where: 'task_id = ?',
+          whereArgs: [task['id']]);
+      await db.delete('task_photos',
+          where: 'task_id = ?',
+          whereArgs: [task['id']]);
     }
 
-    // Delete tasks
-    await db.delete(
-      'tasks',
-      where: 'work_day_id = ?',
-      whereArgs: [workDayId],
-    );
+    await db.delete('tasks',
+        where: 'work_day_id = ?',
+        whereArgs: [workDayId]);
+    await db.delete('sessions',
+        where: 'work_day_id = ?',
+        whereArgs: [workDayId]);
+    await db.delete('work_days',
+        where: 'id = ?', whereArgs: [workDayId]);
+  }
 
-    // Delete sessions
-    await db.delete(
-      'sessions',
-      where: 'work_day_id = ?',
-      whereArgs: [workDayId],
-    );
-
-    // Delete the work day
-    await db.delete(
-      'work_days',
-      where: 'id = ?',
-      whereArgs: [workDayId],
-    );
+  Future close() async {
+    final db = await instance.database;
+    db.close();
   }
 }

@@ -19,6 +19,7 @@ class JobsScreen extends StatefulWidget {
 
 class _JobsScreenState extends State<JobsScreen> {
   List<Job> _jobs = [];
+  Map<int, int> _taskMinutesByDay = {};
   bool _loading = true;
 
   @override
@@ -28,9 +29,28 @@ class _JobsScreenState extends State<JobsScreen> {
   }
 
   Future<void> _load() async {
-    final jobs = await JobDao().getAll();
+    final days = await WorkDayDao().getByJob(_job.id!);
+    final Map<int, List<Task>> taskMap = {};
+    final Map<int, int> minutesMap = {};
+
+    for (final day in days) {
+      if (day.id != null) {
+        final tasks = await TaskDao().getByWorkDay(day.id!);
+        taskMap[day.id!] = tasks;
+        int dayMinutes = 0;
+        for (final task in tasks) {
+          if (task.id != null) {
+            dayMinutes += await TaskSessionDao()
+                .totalMinutes(task.id!);
+          }
+        }
+        minutesMap[day.id!] = dayMinutes;
+      }
+    }
     setState(() {
-      _jobs = jobs;
+      _days = days;
+      _tasksByDay = taskMap;
+      _taskMinutesByDay = minutesMap;
       _loading = false;
     });
   }
@@ -234,10 +254,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     });
   }
 
-  int get _totalMinutes => _tasksByDay.values
-      .expand((tasks) => tasks)
-      .where((t) => t.isComplete)
-      .fold(0, (s, t) => s + t.durationMinutesRounded);
+  int get _totalMinutes =>
+    _taskMinutesByDay.values.fold(0, (a, b) => a + b);
 
   Future<void> _updateStatus(String status) async {
     final updated = _job.copyWith(status: status);
@@ -317,7 +335,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             ),
                             _StatBlock(
                               label: 'TASKS DONE',
-                              value: '${_tasksByDay.values.expand((t) => t).where((t) => t.isComplete).length}',
+                              value: '${_tasksByDay.values.expand((t) => t).length}',
                             ),
                           ],
                         ),
@@ -342,17 +360,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   const SizedBox(height: 12),
                   ..._days.map((day) {
                     final tasks = _tasksByDay[day.id] ?? [];
-                    final minutes = tasks
-                        .where((t) => t.isComplete)
-                        .fold(
-                            0,
-                            (s, t) =>
-                                s + t.durationMinutesRounded);
+                    final minutes = _taskMinutesByDay[day.id] ?? 0;
                     return _DayRow(
                       day: day,
-                      taskCount: tasks
-                          .where((t) => t.isComplete)
-                          .length,
+                      taskCount: tasks.length,
                       totalMinutes: minutes,
                       onTap: () async {
                         final name =

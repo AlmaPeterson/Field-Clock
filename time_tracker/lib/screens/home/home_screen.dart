@@ -16,6 +16,9 @@ import '../jobs/jobs_screen.dart';
 import '../../database/dao/job_dao.dart';
 import 'package:flutter/scheduler.dart';
 import '../../widgets/session_edit_dialog.dart';
+import '../../models/task_session.dart';
+import '../../database/dao/task_session_dao.dart';
+import '../../models/task.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -596,32 +599,43 @@ class _TaskActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeTask = provider.activeTask;
+    final activeSession = provider.activeTaskSession;
+    final primary =
+        Theme.of(context).colorScheme.primary;
 
-    if (activeTask != null) {
+    if (activeTask != null && activeSession != null) {
       return Card(
         color: Theme.of(context).dividerColor,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               Text('ACTIVE TASK',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.success,
-                  )),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(
+                          color: AppColors.success)),
               const SizedBox(height: 4),
               Text(
-                'Started ${TimeUtils.formatTime(activeTask.startTime)}',
-                style: Theme.of(context).textTheme.bodyMedium,
+                activeTask.name == 'Unnamed Task'
+                    ? 'Session started ${TimeUtils.formatTime(activeSession.startTime)}'
+                    : '${activeTask.name} · started ${TimeUtils.formatTime(activeSession.startTime)}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium,
               ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.camera_alt),
-                  label: const Text('Take After Photo & End Task'),
+                  label: const Text(
+                      'Take After Photo & End Session'),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary),
+                      backgroundColor: primary),
                   onPressed: onEndTask,
                 ),
               ),
@@ -631,14 +645,129 @@ class _TaskActionCard extends StatelessWidget {
       );
     }
 
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        icon: const Icon(Icons.camera_alt),
-        label: const Text('Take Before Photo & Start Task'),
-        style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-        onPressed: onStartTask,
+    // No active task — show start + resume options
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.camera_alt),
+            label:
+                const Text('Take Before Photo & Start Task'),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success),
+            onPressed: onStartTask,
+          ),
+        ),
+        // Resume a previous task
+        if (provider.todayTasks.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _ResumeTaskButton(provider: provider),
+        ],
+      ],
+    );
+  }
+}
+
+class _ResumeTaskButton extends StatelessWidget {
+  final WorkDayProvider provider;
+  const _ResumeTaskButton({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final primary =
+        Theme.of(context).colorScheme.primary;
+
+    // Only show tasks that aren't currently active
+    final resumableTasks = provider.todayTasks
+        .where((t) => t.id != provider.activeTask?.id)
+        .toList();
+
+    if (resumableTasks.isEmpty)
+      return const SizedBox.shrink();
+
+    return OutlinedButton.icon(
+      icon: Icon(Icons.replay, color: primary),
+      label: Text('Resume a Task',
+          style: TextStyle(color: primary)),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: primary),
+        minimumSize:
+            const Size(double.infinity, 48),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
       ),
+      onPressed: () async {
+        final task =
+            await showModalBottomSheet<Task>(
+          context: context,
+          backgroundColor:
+              Theme.of(context).cardColor,
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(20))),
+          builder: (_) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text('RESUME TASK',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge),
+                const SizedBox(height: 16),
+                ...resumableTasks.map((t) =>
+                    ListTile(
+                      title: Text(t.name,
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.color)),
+                      subtitle: t.division != null
+                          ? Text(t.division!,
+                              style: TextStyle(
+                                  color: primary,
+                                  fontSize: 12))
+                          : null,
+                      trailing: Icon(
+                          Icons.play_circle_outline,
+                          color: primary),
+                      onTap: () =>
+                          Navigator.pop(context, t),
+                    )),
+                SizedBox(
+                    height: MediaQuery.of(context)
+                            .padding
+                            .bottom +
+                        8),
+              ],
+            ),
+          ),
+        );
+        if (task == null) return;
+        // Take a before photo for the new session
+        if (!context.mounted) return;
+        final photoResult =
+            await Navigator.push<String?>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CameraScreen(
+              mode: CaptureMode.taskStart,
+              taskName: task.name,
+            ),
+          ),
+        );
+        if (photoResult == null) return;
+        final photoPath =
+            photoResult == 'skip' ? null : photoResult;
+        await context
+            .read<WorkDayProvider>()
+            .resumeTask(
+                task: task, photoPath: photoPath);
+      },
     );
   }
 }
@@ -651,7 +780,7 @@ class _TaskListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = provider.todayTasks.where((t) => t.isComplete).toList();
+    final tasks = provider.todayTasks.toList();
     if (tasks.isEmpty) return const SizedBox.shrink();
 
     return Card(
@@ -664,22 +793,25 @@ class _TaskListCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 12),
             ...tasks.map((task) => _TaskRow(task: task)),
-            Divider(color: Theme.of(context).dividerColor, height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Total hours',
-                    style: Theme.of(context).textTheme.titleMedium),
-                Text(
-                  TimeUtils.formatDuration(Duration(
-                    minutes: tasks.fold(
-                        0, (s, t) => s + t.durationMinutesRounded),
-                  )),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+            Consumer<WorkDayProvider>(
+              builder: (context, provider, _) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total on site',
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      TimeUtils.formatDuration(Duration(
+                          minutes: provider.totalSessionMinutes)),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),  
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -688,72 +820,134 @@ class _TaskListCard extends StatelessWidget {
   }
 }
 
-class _TaskRow extends StatelessWidget {
-  final task;
+class _TaskRow extends StatefulWidget {
+  final Task task;
   const _TaskRow({required this.task});
 
   @override
+  State<_TaskRow> createState() => _TaskRowState();
+}
+
+class _TaskRowState extends State<_TaskRow> {
+  int _totalMinutes = 0;
+  List<TaskSession> _sessions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.task.id == null) return;
+    final sessions = await TaskSessionDao()
+        .getByTask(widget.task.id!);
+    final total = sessions
+        .where((s) => !s.isActive)
+        .fold(0,
+            (sum, s) => sum + s.durationMinutesRounded);
+    if (mounted) {
+      setState(() {
+        _sessions = sessions;
+        _totalMinutes = total;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final primary =
+        Theme.of(context).colorScheme.primary;
+    final firstSession =
+        _sessions.isNotEmpty ? _sessions.first : null;
+
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () async {
         await Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => TaskDetailScreen(task: task)),
+              builder: (_) =>
+                  TaskDetailScreen(task: widget.task)),
         );
-        // Provider reloads automatically via loadToday
         if (context.mounted) {
-          context.read<WorkDayProvider>().loadToday();
+          context
+              .read<WorkDayProvider>()
+              .loadToday();
         }
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Row(
-            children: [
-            // Before photo thumbnail
-            if (task.startPhoto != null)
-                ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+          children: [
+            // First session before photo
+            if (firstSession?.startPhoto != null)
+              ClipRRect(
+                borderRadius:
+                    BorderRadius.circular(6),
                 child: Image.file(
-                    File(task.startPhoto!),
-                    width: 40, height: 40, fit: BoxFit.cover,
+                  File(firstSession!.startPhoto!),
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
                 ),
-                )
+              )
             else
-                Container(
-                width: 40, height: 40,
+              Container(
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor,
-                    borderRadius: BorderRadius.circular(6),
+                  color:
+                      Theme.of(context).dividerColor,
+                  borderRadius:
+                      BorderRadius.circular(6),
                 ),
-                child: Icon(Icons.image_not_supported,
-                    color: Theme.of(context).textTheme.bodyMedium!.color!, size: 18),
-                ),
+                child: Icon(
+                    Icons.image_not_supported,
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color,
+                    size: 18),
+              ),
             const SizedBox(width: 12),
             Expanded(
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                    Text(task.name,
-                        style: Theme.of(context).textTheme.bodyLarge),
+                  Text(widget.task.name,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge),
+                  if (widget.task.division != null)
+                    Text(widget.task.division!,
+                        style: TextStyle(
+                            color: primary,
+                            fontSize: 11,
+                            fontWeight:
+                                FontWeight.w600)),
+                  if (_sessions.isNotEmpty)
                     Text(
-                    '${TimeUtils.formatTime(task.startTime)} → ${TimeUtils.formatTime(task.endTime!)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                      '${_sessions.where((s) => !s.isActive).length} session${_sessions.where((s) => !s.isActive).length == 1 ? '' : 's'}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium,
                     ),
                 ],
-                ),
+              ),
             ),
             Text(
-                TimeUtils.formatDuration(task.durationRounded),
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
+              TimeUtils.formatDuration(
+                  Duration(minutes: _totalMinutes)),
+              style: TextStyle(
+                color: primary,
                 fontWeight: FontWeight.w600,
-                ),
+              ),
             ),
-            ],
+          ],
         ),
-        ),
+      ),
     );
   }
 }

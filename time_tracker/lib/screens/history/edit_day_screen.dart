@@ -16,6 +16,8 @@ import '../../utils/time_utils.dart';
 import '../../utils/divisions.dart';
 import '../task/task_detail_screen.dart';
 import 'dart:io';
+import '../../models/task_session.dart';
+import '../../database/dao/task_session_dao.dart';
 
 class EditDayScreen extends StatefulWidget {
   final WorkDay day;
@@ -54,6 +56,7 @@ class _EditDayScreenState extends State<EditDayScreen> {
         await _sessionDao.getByWorkDay(widget.day.id!);
     final tasks =
         await _taskDao.getByWorkDay(widget.day.id!);
+    final taskId = await _taskDao.insert(task);
     final jobs = await _jobDao.getAll();
 
     Job? currentJob;
@@ -89,46 +92,46 @@ class _EditDayScreenState extends State<EditDayScreen> {
   // ── Existing session actions ─────────────────────
 
   Future<void> _editExistingSession(
-      Session session) async {
-    final result =
-        await showDialog<Map<String, TimeOfDay?>>(
-      context: context,
-      builder: (_) =>
-          _SessionTimeDialog(session: session),
-    );
-    if (result == null) return;
+    Session session) async {
+      final result =
+          await showDialog<Map<String, TimeOfDay?>>(
+        context: context,
+        builder: (_) =>
+            _SessionTimeDialog(session: session),
+      );
+      if (result == null) return;
 
-    final newIn = result['clockIn'];
-    final newOut = result['clockOut'];
-    if (newIn == null) return;
+      final newIn = result['clockIn'];
+      final newOut = result['clockOut'];
+      if (newIn == null) return;
 
-    final clockIn = _toDateTime(_selectedDate, newIn);
-    final clockOut = newOut != null
-        ? _toDateTime(_selectedDate, newOut)
-        : session.clockOutTime;
+      final clockIn = _toDateTime(_selectedDate, newIn);
+      final clockOut = newOut != null
+          ? _toDateTime(_selectedDate, newOut)
+          : session.clockOutTime;
 
-    int duration = session.durationMinutes;
-    if (clockOut != null) {
-      final raw = clockOut.difference(clockIn);
-      duration =
-          TimeUtils.roundToNearest15(raw).inMinutes;
+      int duration = session.durationMinutes;
+      if (clockOut != null) {
+        final raw = clockOut.difference(clockIn);
+        duration =
+            TimeUtils.roundToNearest15(raw).inMinutes;
+      }
+
+      final updated = Session(
+        id: session.id,
+        workDayId: session.workDayId,
+        clockInTime: clockIn,
+        clockInPhoto: session.clockInPhoto,
+        clockInLocation: session.clockInLocation,
+        clockOutTime: clockOut,
+        clockOutPhoto: session.clockOutPhoto,
+        clockOutLocation: session.clockOutLocation,
+        durationMinutes: duration,
+      );
+
+      await _sessionDao.update(updated);
+      await _load();
     }
-
-    final updated = Session(
-      id: session.id,
-      workDayId: session.workDayId,
-      clockInTime: clockIn,
-      clockInPhoto: session.clockInPhoto,
-      clockInLocation: session.clockInLocation,
-      clockOutTime: clockOut,
-      clockOutPhoto: session.clockOutPhoto,
-      clockOutLocation: session.clockOutLocation,
-      durationMinutes: duration,
-    );
-
-    await _sessionDao.update(updated);
-    await _load();
-  }
 
   Future<void> _deleteExistingSession(
       Session session) async {
@@ -247,11 +250,26 @@ class _EditDayScreenState extends State<EditDayScreen> {
           division: t.division,
           notes: t.notes,
           startTime: startTime,
-          endTime: endTime,
-          durationMinutesRaw: rawMin,
-          durationMinutesRounded: roundedMin,
         );
         final taskId = await _taskDao.insert(task);
+
+        // Insert as a task session
+        if (t.endTime != null) {
+          final endDt =
+              _toDateTime(_selectedDate, t.endTime!);
+          final raw = endDt.difference(startTime).inMinutes;
+          final rounded =
+              TimeUtils.roundToNearest15(
+                      Duration(minutes: raw))
+                  .inMinutes;
+          await TaskSessionDao().insert(TaskSession(
+            taskId: taskId,
+            startTime: startTime,
+            endTime: endDt,
+            durationMinutesRaw: raw,
+            durationMinutesRounded: rounded,
+          ));
+        }
 
         for (final photo in t.photos) {
           await _taskPhotoDao.insert(TaskPhoto(
@@ -705,11 +723,8 @@ class _ExistingTaskCard extends StatelessWidget {
                             fontWeight:
                                 FontWeight.w600)),
                   Text(
-                    task.endTime != null
-                        ? '${TimeUtils.formatTime(task.startTime)} → ${TimeUtils.formatTime(task.endTime!)}  ·  ${TimeUtils.formatDuration(task.durationRounded)}'
-                        : 'Started ${TimeUtils.formatTime(task.startTime)}',
-                    style: TextStyle(
-                        color: muted, fontSize: 12),
+                    'Started ${TimeUtils.formatTime(task.startTime)}',
+                    style: TextStyle(color: muted, fontSize: 12),
                   ),
                 ],
               ),
