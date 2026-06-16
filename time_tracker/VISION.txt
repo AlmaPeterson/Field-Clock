@@ -20,11 +20,11 @@ with timestamps, locations, photos, and total hours. No paperwork. No disputes.
 
 ## Core Principles
 
-- **Offline-first** — Works on job sites with no signal. Syncs when connected.
+- **Offline-first** — Works on job sites with no signal. Photos stay local; cloud backup syncs when connected.
 - **Photo-verified** — Every time entry is backed by a real image with a timestamp.
 - **One-handed simplicity** — Designed for workers with dirty gloves. Big buttons, minimal taps.
 - **Manager-ready output** — Summaries are formatted for approval, not just personal reference.
-- **No data loss** — Time records are too important to lose. Everything is backed up.
+- **No data loss** — Time records are too important to lose. Cloud backup offloads photos; local is the cache.
 
 ---
 
@@ -47,42 +47,46 @@ with timestamps, locations, photos, and total hours. No paperwork. No disputes.
 
 ## Feature Plan
 
-### Phase 1 — MVP (Build First)
+### Phase 1 — MVP ✅ Done
 
-| Feature | Description |
-|---|---|
-| Clock In / Clock Out | Photo taken at start and end of workday. Timestamp locked automatically. |
-| Task Tracking | Take a "before" photo to start a task, "after" photo to end it. |
-| Auto Time Calculation | Time per task calculated automatically, rounded to nearest 15 minutes. |
-| Task Naming | Name each task after completing it (e.g. "Framing — Master Bedroom"). |
-| Time Editing | Manually adjust start/end time if you forgot to log something. |
-| Daily Summary Screen | Clean overview: clock in/out, list of tasks, total hours for the day. |
-| Share Daily Summary | Send full day summary (with or without photos) via any share method. |
-| Share Single Task | Share one specific task with its photos and time. |
+| Feature | Status | Description |
+|---|---|---|
+| Clock In / Clock Out | ✅ | Photo taken at start and end of workday. Timestamp locked automatically. |
+| Task Tracking | ✅ | Take a "before" photo to start a task, "after" photo to end it. |
+| Auto Time Calculation | ✅ | Time per task calculated automatically, rounded to nearest 15 minutes. |
+| Task Naming | ✅ | Name each task after completing it (e.g. "Framing — Master Bedroom"). |
+| Time Editing | ✅ | Manually adjust start/end time if you forgot to log something. |
+| Daily Summary Screen | ✅ | Clean overview: clock in/out, list of tasks, total hours for the day. |
+| Share Daily Summary | ✅ | Send full day summary (with or without photos) via any share method. |
+| Share Single Task | ✅ | Share one specific task with its photos and time. |
+| **Edit Previous Days** | ⚠️ | Edit sessions and tasks on past days. **Currently broken — known issue.** |
 
 ### Phase 2 — Core Value Add
 
-| Feature | Description |
-|---|---|
-| GPS Location per Task | Auto-tag each task with location. Shown in summary and on share. |
-| Job / Project Grouping | Assign tasks and days to a named job (e.g. "123 Oak Street Renovation"). |
-| Task Notes | Short text field per task — materials used, issues found, measurements. |
-| Multiple Photos per Task | Before, during, and after photos per task. |
-| History & Archive | Browse all past days. Filter by date, job, or task type. |
-| Hourly Rate per Task | Set a rate per task or job. App calculates earnings automatically. |
-| Clock-Out Reminder | Notification if still clocked in at end of typical workday. |
+| Feature | Status | Description |
+|---|---|---|
+| GPS Location per Task | ✅ | Auto-tag each task with location. Shown in summary and on share. |
+| Job / Project Grouping | ✅ | Assign tasks and days to a named job (e.g. "123 Oak Street Renovation"). |
+| Task Notes | ✅ | Short text field per task — materials used, issues found, measurements. |
+| Multiple Photos per Task | ✅ | Before, during, and after photos per task. |
+| History & Archive | ✅ | Browse all past days. Filter by date, job, or task type. |
+| PDF Export | ✅ | Export any daily summary as a formatted PDF (condensed or full). |
+| Hourly Rate per Task/Job | ☐ | Set a rate per task or job. App calculates earnings automatically. |
+| Clock-Out Reminder | ☐ | Notification if still clocked in at end of typical workday. |
+| **Multi-Job Per Day** | ☐ | Worker splits a day across two job sites. Tasks assignable to different jobs within one WorkDay. Requires architectural change (currently one job FK per day). |
 
 ### Phase 3 — Power Features
 
-| Feature | Description |
-|---|---|
-| Weekly / Monthly Reports | Total hours and earnings rolled up by week, month, or job. |
-| PDF Export | Export any daily summary or job report as a formatted PDF. |
-| Invoice Generator | Turn a completed job into a ready-to-send invoice PDF. |
-| Cloud Backup | Encrypted backup of all records and photos to cloud storage. |
-| CSV Export | Export records for payroll or accounting software. |
-| PIN / Biometric Lock | Secure the app since it contains sensitive work records. |
-| Multi-Worker (Future) | Crew lead can manage and view summaries for multiple workers. |
+| Feature | Status | Description |
+|---|---|---|
+| Weekly / Monthly Reports | ☐ | Total hours and earnings rolled up by week, month, or job. |
+| Invoice Generator | ☐ | Turn a completed job into a ready-to-send invoice PDF. |
+| Cloud Backup | ☐ | Encrypted backup of all records and photos. Photos offloaded to cloud; local storage is cache. |
+| Manager Approval Flow | ☐ | Manager taps a link to approve or dispute hours. Worker gets notified. Summary can be marked Revised and resent. |
+| CSV Export | ☐ | Export records for payroll or accounting software. |
+| PIN / Biometric Lock | ☐ | Secure the app since it contains sensitive work records. |
+| Multi-Worker (Future) | ☐ | Crew lead can manage and view summaries for multiple workers. |
+| UI Polish & Animations | ☐ | Final pass on transitions, micro-interactions, and edge states. |
 
 ---
 
@@ -172,18 +176,19 @@ App
 │   └── After photo capture
 │
 ├── Task Detail
-│   ├── Photos (before / after)
-│   ├── Edit name, time, notes
+│   ├── Photos (before / after / general)
+│   ├── Edit name, time, notes, division
 │   └── Share this task
 │
 ├── Jobs
 │   ├── Active jobs list
-│   ├── Job detail (all days + tasks)
+│   ├── Job detail (all days + tasks + total hours)
 │   └── Create new job
 │
 ├── History
-│   ├── Calendar view
-│   └── Past day summaries
+│   ├── Past days grouped by month
+│   ├── Monthly stats (hours, days)
+│   └── Edit past day (sessions + tasks) ← broken, needs fix
 │
 └── Settings
     ├── Worker name
@@ -204,16 +209,16 @@ App
 | Language | Dart | Flutter native |
 | Local Database | SQLite (via `sqflite`) | Offline-first, reliable, fast |
 | Camera | `camera` package | Already integrated |
-| Location | `geolocator` package | GPS tagging per task |
+| Location | `geolocator` + `geocoding` | GPS tagging per task |
 | File Storage | `path_provider` | Local photo storage |
 | PDF Generation | `pdf` package | Export and invoice |
 | Sharing | `share_plus` | Native share sheet |
 | Notifications | `flutter_local_notifications` | Clock-out reminders |
-| State Management | Provider or Riverpod | Simple and maintainable |
+| State Management | Provider (ChangeNotifier) | Simple and maintainable |
 
 ---
 
-## Data Models
+## Data Models (Actual Schema — DB version 4)
 
 ```
 Worker
@@ -224,49 +229,35 @@ Job
 
 WorkDay
   - id, job_id, date
-  - clock_in_time, clock_in_photo, clock_in_location
-  - clock_out_time, clock_out_photo, clock_out_location
-  - total_hours_raw, total_hours_rounded
+  (clock in/out state comes from Sessions, not stored directly)
 
-Task
-  - id, workday_id, name, notes
-  - start_time, start_photo, start_location
-  - end_time, end_photo, end_location
-  - duration_raw, duration_rounded
-  - hourly_rate, earnings
+Session  ← one clock-in/clock-out pair; multiple allowed per day
+  - id, work_day_id, clock_in_time, clock_out_time
+
+Task  ← container: name, category, notes, location
+  - id, work_day_id, name, division, notes, location
+  (no time fields — time lives on TaskSession)
+
+TaskSession  ← one start/end pair; multiple allowed per task (resume support)
+  - id, task_id, start_time, end_time
+
+TaskPhoto  ← before / after / general; multiple allowed per task
+  - id, task_id, type, file_path, timestamp
 ```
+
+**Key rules:**
+- Task has no `startTime`, `endTime`, `duration`, or photo fields — those all live on TaskSession / TaskPhoto
+- WorkDay has no `clockInTime` / `clockOutTime` fields — derived from Session records
+- Duration rounding always goes through `TimeUtils.roundToNearest15()`
+- Multi-job per day is not yet supported (WorkDay has one `job_id`); planned for Phase 2
 
 ---
 
-## Development Phases & Timeline
+## Known Issues / Next Up
 
-### Phase 1 — MVP (Weeks 1–4)
-- [ ] Project setup, navigation, theme
-- [ ] SQLite database + data models
-- [ ] Clock in / clock out with camera
-- [ ] Task before/after photo flow
-- [ ] Auto time calculation + rounding
-- [ ] Task naming and time editing
-- [ ] Daily summary screen
-- [ ] Share summary (text + photos)
-
-### Phase 2 — Core Value (Weeks 5–8)
-- [ ] GPS location tagging
-- [ ] Job/project grouping
-- [ ] Task notes field
-- [ ] Multiple photos per task
-- [ ] History / archive screen
-- [ ] Hourly rate + earnings calc
-- [ ] Clock-out reminder notification
-
-### Phase 3 — Polish & Power (Weeks 9–12)
-- [ ] PDF export
-- [ ] Weekly/monthly reports
-- [ ] Invoice generator
-- [ ] Cloud backup
-- [ ] CSV export
-- [ ] PIN / biometric lock
-- [ ] UI polish and animations
+- **Edit previous days is broken** — the edit_day_screen flow has bugs; fixing this is the next priority
+- **Multi-job per day** — current schema limits one job per WorkDay; needs a model change before implementing
+- **Photo storage growth** — no cleanup strategy yet; cloud backup (Phase 3) is the long-term answer
 
 ---
 
@@ -294,4 +285,5 @@ Task
 ---
 
 *Document created: June 2026*
-*Version: 1.0*
+*Last updated: June 2026*
+*Version: 1.1*

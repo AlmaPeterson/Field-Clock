@@ -56,7 +56,6 @@ class _EditDayScreenState extends State<EditDayScreen> {
         await _sessionDao.getByWorkDay(widget.day.id!);
     final tasks =
         await _taskDao.getByWorkDay(widget.day.id!);
-    final taskId = await _taskDao.insert(task);
     final jobs = await _jobDao.getAll();
 
     Job? currentJob;

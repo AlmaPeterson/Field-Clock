@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../database/dao/job_dao.dart';
 import '../../database/dao/work_day_dao.dart';
 import '../../database/dao/task_dao.dart';
+import '../../database/dao/session_dao.dart';
+import '../../models/session.dart';
 import '../../models/job.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';
@@ -19,7 +21,6 @@ class JobsScreen extends StatefulWidget {
 
 class _JobsScreenState extends State<JobsScreen> {
   List<Job> _jobs = [];
-  Map<int, int> _taskMinutesByDay = {};
   bool _loading = true;
 
   @override
@@ -29,28 +30,9 @@ class _JobsScreenState extends State<JobsScreen> {
   }
 
   Future<void> _load() async {
-    final days = await WorkDayDao().getByJob(_job.id!);
-    final Map<int, List<Task>> taskMap = {};
-    final Map<int, int> minutesMap = {};
-
-    for (final day in days) {
-      if (day.id != null) {
-        final tasks = await TaskDao().getByWorkDay(day.id!);
-        taskMap[day.id!] = tasks;
-        int dayMinutes = 0;
-        for (final task in tasks) {
-          if (task.id != null) {
-            dayMinutes += await TaskSessionDao()
-                .totalMinutes(task.id!);
-          }
-        }
-        minutesMap[day.id!] = dayMinutes;
-      }
-    }
+    final jobs = await JobDao().getAll();
     setState(() {
-      _days = days;
-      _tasksByDay = taskMap;
-      _taskMinutesByDay = minutesMap;
+      _jobs = jobs;
       _loading = false;
     });
   }
@@ -229,6 +211,7 @@ class JobDetailScreen extends StatefulWidget {
 class _JobDetailScreenState extends State<JobDetailScreen> {
   List<WorkDay> _days = [];
   Map<int, List<Task>> _tasksByDay = {};
+  Map<int, int> _taskMinutesByDay = {};
   bool _loading = true;
   late Job _job;
 
@@ -242,14 +225,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Future<void> _load() async {
     final days = await WorkDayDao().getByJob(_job.id!);
     final Map<int, List<Task>> taskMap = {};
+    final Map<int, int> minutesMap = {};
     for (final day in days) {
       if (day.id != null) {
-        taskMap[day.id!] = await TaskDao().getByWorkDay(day.id!);
+        final tasks = await TaskDao().getByWorkDay(day.id!);
+        taskMap[day.id!] = tasks;
+        final daySessions = await SessionDao().getByWorkDay(day.id!);
+        minutesMap[day.id!] = daySessions
+            .where((s) => !s.isActive)
+            .fold<int>(0, (sum, s) => sum + s.durationMinutes);
       }
     }
     setState(() {
       _days = days;
       _tasksByDay = taskMap;
+      _taskMinutesByDay = minutesMap;
       _loading = false;
     });
   }

@@ -8,7 +8,8 @@ import '../../utils/time_utils.dart';
 import '../summary/summary_screen.dart';
 import '../../utils/prefs_utils.dart';
 import 'past_day_entry_screen.dart';
-import '../../database/dao/task_session_dao.dart';
+import '../../database/dao/session_dao.dart';
+import '../../models/session.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -38,14 +39,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (day.id != null) {
         final tasks = await TaskDao().getByWorkDay(day.id!);
         taskMap[day.id!] = tasks;
-        int dayMinutes = 0;
-        for (final task in tasks) {
-          if (task.id != null) {
-            dayMinutes += await TaskSessionDao()
-                .totalMinutes(task.id!);
-          }
-        }
-        minutesMap[day.id!] = dayMinutes;
+        final daySessions = await SessionDao().getByWorkDay(day.id!);
+        minutesMap[day.id!] = daySessions
+            .where((s) => !s.isActive)
+            .fold<int>(0, (sum, s) => sum + s.durationMinutes);
       }
     }
     setState(() {
@@ -249,8 +246,6 @@ class _DayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final completed = tasks.toList();
-    final totalMinutes =
-        completed.fold(0, (s, t) => s + t.durationMinutesRounded);
     final isComplete = day.isComplete;
 
     return Card(

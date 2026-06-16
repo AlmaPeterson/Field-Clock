@@ -175,30 +175,33 @@ class _PastDayEntryScreenState
 
       // Create tasks
       for (final t in _tasks) {
-        if (t.startTime == null) continue;
-        final startTime =
-            _toDateTime(_selectedDate, t.startTime!);
-        final endTime = t.endTime != null
-            ? _toDateTime(_selectedDate, t.endTime!)
-            : null;
-        int rawMin = 0;
-        int roundedMin = 0;
-        if (endTime != null) {
-          final raw = endTime.difference(startTime);
-          rawMin = raw.inMinutes;
-          roundedMin =
-              TimeUtils.roundToNearest15(raw).inMinutes;
-        }
+        final validTimes =
+            t.times.where((e) => e.startTime != null).toList();
+        if (validTimes.isEmpty) continue;
         final task = Task(
           workDayId: dayId,
           name: t.name.isEmpty ? 'Unnamed Task' : t.name,
           division: t.division,
           notes: t.notes,
-          startTime: startTime,
+          startTime: _toDateTime(
+              _selectedDate, validTimes.first.startTime!),
         );
         final taskId = await TaskDao().insert(task);
 
-        if (endTime != null) {
+        for (final te in validTimes) {
+          final startTime =
+              _toDateTime(_selectedDate, te.startTime!);
+          final endTime = te.endTime != null
+              ? _toDateTime(_selectedDate, te.endTime!)
+              : null;
+          int rawMin = 0;
+          int roundedMin = 0;
+          if (endTime != null) {
+            final raw = endTime.difference(startTime);
+            rawMin = raw.inMinutes;
+            roundedMin =
+                TimeUtils.roundToNearest15(raw).inMinutes;
+          }
           await TaskSessionDao().insert(TaskSession(
             taskId: taskId,
             startTime: startTime,
@@ -207,7 +210,7 @@ class _PastDayEntryScreenState
             durationMinutesRounded: roundedMin,
           ));
         }
-        
+
         // Save photos
         for (final photo in t.photos) {
           await TaskPhotoDao().insert(TaskPhoto(
@@ -560,12 +563,16 @@ class _TaskPhoto {
   _TaskPhoto({required this.path, required this.type});
 }
 
+class _TaskTimeEntry {
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
+}
+
 class _TaskEntry {
   String name = '';
   String? division;
   String? notes;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
+  List<_TaskTimeEntry> times = [_TaskTimeEntry()];
   List<_TaskPhoto> photos = [];
 }
 
@@ -595,6 +602,16 @@ class _TaskEntryCardState
   List<String> _filteredDivisions = Divisions.all;
   bool _showDivisionList = false;
   final _picker = ImagePicker();
+
+  String _duration(TimeOfDay i, TimeOfDay o) {
+    final inMin = i.hour * 60 + i.minute;
+    final outMin = o.hour * 60 + o.minute;
+    final diff = outMin - inMin;
+    if (diff <= 0) return 'Check times';
+    final rounded =
+        TimeUtils.roundToNearest15(Duration(minutes: diff));
+    return TimeUtils.formatDuration(rounded);
+  }
 
   @override
   void initState() {
@@ -627,21 +644,19 @@ class _TaskEntryCardState
     });
   }
 
-  Future<void> _pickTime(bool isStart) async {
+  Future<void> _pickTime(_TaskTimeEntry entry, bool isStart) async {
     final picked = await showTimePicker(
       context: context,
       initialTime: isStart
-          ? (widget.entry.startTime ??
-              const TimeOfDay(hour: 8, minute: 0))
-          : (widget.entry.endTime ??
-              const TimeOfDay(hour: 9, minute: 0)),
+          ? (entry.startTime ?? const TimeOfDay(hour: 8, minute: 0))
+          : (entry.endTime ?? const TimeOfDay(hour: 9, minute: 0)),
     );
     if (picked != null) {
       setState(() {
         if (isStart) {
-          widget.entry.startTime = picked;
+          entry.startTime = picked;
         } else {
-          widget.entry.endTime = picked;
+          entry.endTime = picked;
         }
       });
       widget.onChanged();
@@ -882,27 +897,77 @@ class _TaskEntryCardState
             ],
             const SizedBox(height: 10),
 
-            // Times
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeTap(
-                    label: 'Start',
-                    time: widget.entry.startTime,
-                    color: AppColors.success,
-                    onTap: () => _pickTime(true),
-                  ),
+            // Times — multiple sessions allowed
+            ...widget.entry.times.asMap().entries.expand((e) {
+              final i = e.key;
+              final te = e.value;
+              return <Widget>[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _TimeTap(
+                        label: 'Start',
+                        time: te.startTime,
+                        color: AppColors.success,
+                        onTap: () => _pickTime(te, true),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TimeTap(
+                        label: 'End',
+                        time: te.endTime,
+                        color: primary,
+                        onTap: () => _pickTime(te, false),
+                      ),
+                    ),
+                    if (widget.entry.times.length > 1) ...[
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 14,
+                            color: Theme.of(context).colorScheme.error),
+                        onPressed: () {
+                          setState(() => widget.entry.times.removeAt(i));
+                          widget.onChanged();
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TimeTap(
-                    label: 'End',
-                    time: widget.entry.endTime,
-                    color: primary,
-                    onTap: () => _pickTime(false),
+                if (te.startTime != null && te.endTime != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 2),
+                    child: Text(
+                      _duration(te.startTime!, te.endTime!),
+                      style: TextStyle(
+                          color: primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-              ],
+                const SizedBox(height: 8),
+              ];
+            }).toList(),
+            OutlinedButton.icon(
+              icon: Icon(Icons.add, color: primary, size: 14),
+              label: Text('Add Time',
+                  style: TextStyle(color: primary, fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: primary.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () {
+                setState(() =>
+                    widget.entry.times.add(_TaskTimeEntry()));
+                widget.onChanged();
+              },
             ),
             const SizedBox(height: 10),
 

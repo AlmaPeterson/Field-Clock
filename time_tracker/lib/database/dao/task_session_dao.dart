@@ -69,7 +69,7 @@ class TaskSessionDao {
     final sessions = await getByTask(taskId);
     return sessions
         .where((s) => !s.isActive)
-        .fold(0,
+        .fold<int>(0,
             (sum, s) => sum + s.durationMinutesRounded);
   }
 }

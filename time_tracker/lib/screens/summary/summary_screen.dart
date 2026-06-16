@@ -65,10 +65,9 @@ class _SummaryScreenState extends State<SummaryScreen> {
     });
   }
 
-  int get _totalMinutes => _taskSessionsMap.values
-    .expand((sessions) => sessions)
+  int get _totalMinutes => _sessions
     .where((s) => !s.isActive)
-    .fold(0, (sum, s) => sum + s.durationMinutesRounded);
+    .fold<int>(0, (sum, s) => sum + s.durationMinutes);
 
   void _showShareSheet() {
     showModalBottomSheet(
