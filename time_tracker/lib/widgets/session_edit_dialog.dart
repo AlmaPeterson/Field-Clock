@@ -104,9 +104,6 @@ class _SessionEditDialogState extends State<SessionEditDialog> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final cardColor = Theme.of(context).cardColor;
-    final dividerColor = Theme.of(context).dividerColor;
-    final bodyColor =
-        Theme.of(context).textTheme.bodyLarge?.color;
     final mutedColor =
         Theme.of(context).textTheme.bodyMedium?.color;
 

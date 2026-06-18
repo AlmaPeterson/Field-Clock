@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';
@@ -426,13 +425,11 @@ class _DayOverviewCard extends StatelessWidget {
 class _StatBlock extends StatelessWidget {
   final String label;
   final String value;
-  final String? photo;
   final bool highlight;
 
   const _StatBlock({
     required this.label,
     required this.value,
-    this.photo,
     this.highlight = false,
   });
 
@@ -441,12 +438,6 @@ class _StatBlock extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          if (photo != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(File(photo!),
-                  width: 52, height: 52, fit: BoxFit.cover),
-            ),
           const SizedBox(height: 6),
           Text(label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -668,39 +659,6 @@ class _TaskDetailCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PhotoThumb extends StatelessWidget {
-  final String label;
-  final String path;
-
-  const _PhotoThumb({required this.label, required this.path});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(fontSize: 10)),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              File(path),
-              height: 100,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ],
       ),
     );
   }
