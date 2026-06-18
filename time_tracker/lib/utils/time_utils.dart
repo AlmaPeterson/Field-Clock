@@ -43,6 +43,26 @@ class TimeUtils {
     return '${days[dt.weekday - 1]}, ${months[dt.month]} ${dt.day} ${dt.year}';
   }
 
+  /// Format DateTime as "June 17 2026" (no weekday)
+  static String formatDateShort(DateTime dt) {
+    const months = [
+      '','January','February','March','April','May','June',
+      'July','August','September','October','November','December'
+    ];
+    return '${months[dt.month]} ${dt.day} ${dt.year}';
+  }
+
+  /// Format minutes as decimal hours, e.g. 450 -> "7.5", 480 -> "8"
+  static String formatHoursDecimal(int minutes) {
+    final hours = minutes / 60.0;
+    String s = hours.toStringAsFixed(2);
+    if (s.contains('.')) {
+      s = s.replaceFirst(RegExp(r'0+$'), '');
+      s = s.replaceFirst(RegExp(r'\.$'), '');
+    }
+    return s;
+  }
+
   /// Calculate earnings from duration and hourly rate
   static double calculateEarnings(Duration duration, double hourlyRate) {
     return (duration.inMinutes / 60) * hourlyRate;

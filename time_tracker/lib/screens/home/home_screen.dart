@@ -97,6 +97,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
     await provider.startTask(photoPath: photoPath, location: location);
   }
 
+  Future<void> _handleStartTaskNoPhoto(
+      BuildContext context, WorkDayProvider provider) async {
+    final location = await LocationUtils.getCurrentLocation();
+    await provider.startTask(photoPath: null, location: location);
+  }
+
   Future<void> _handleEndTask(
       BuildContext context, WorkDayProvider provider) async {
     final result = await Navigator.push<String?>(
@@ -127,6 +133,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
       division: taskResult?['division'],
       notes: taskResult?['notes'],
       photoPath: photoPath,
+      location: location,
+    );
+  }
+
+  Future<void> _handleEndTaskNoPhoto(
+      BuildContext context, WorkDayProvider provider) async {
+    final location = await LocationUtils.getCurrentLocation();
+    if (!context.mounted) return;
+    final taskResult = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const TaskNameDialog(),
+    );
+    await provider.endTask(
+      name: taskResult?['name'] ?? 'Unnamed Task',
+      division: taskResult?['division'],
+      notes: taskResult?['notes'],
+      photoPath: null,
       location: location,
     );
   }
@@ -214,7 +238,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
       ),
       body: Consumer<WorkDayProvider>(
         builder: (context, provider, _) {
-          return ListView(
+          return RefreshIndicator(
+            onRefresh: () => provider.loadToday(),
+            child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               Text(
@@ -232,7 +259,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
                 _TaskActionCard(
                   provider: provider,
                   onStartTask: () => _handleStartTask(context, provider),
+                  onStartTaskNoPhoto: () =>
+                      _handleStartTaskNoPhoto(context, provider),
                   onEndTask: () => _handleEndTask(context, provider),
+                  onEndTaskNoPhoto: () =>
+                      _handleEndTaskNoPhoto(context, provider),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -265,6 +296,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver{
                 ),
               ],
             ],
+          ),
           );
         },
       ),
@@ -588,12 +620,16 @@ class _MiniPhotoPlaceholder extends StatelessWidget {
 class _TaskActionCard extends StatelessWidget {
   final WorkDayProvider provider;
   final VoidCallback onStartTask;
+  final VoidCallback onStartTaskNoPhoto;
   final VoidCallback onEndTask;
+  final VoidCallback onEndTaskNoPhoto;
 
   const _TaskActionCard({
     required this.provider,
     required this.onStartTask,
+    required this.onStartTaskNoPhoto,
     required this.onEndTask,
+    required this.onEndTaskNoPhoto,
   });
 
   @override
@@ -628,16 +664,28 @@ class _TaskActionCard extends StatelessWidget {
                     .bodyMedium,
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text(
-                      'Take After Photo & End Session'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: primary),
-                  onPressed: onEndTask,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('With Photo'),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: primary),
+                      onPressed: onEndTask,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.stop),
+                      label: const Text('No Photo'),
+                      style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: primary)),
+                      onPressed: onEndTaskNoPhoto,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -648,16 +696,28 @@ class _TaskActionCard extends StatelessWidget {
     // No active task — show start + resume options
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.camera_alt),
-            label:
-                const Text('Take Before Photo & Start Task'),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success),
-            onPressed: onStartTask,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('With Photo'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success),
+                onPressed: onStartTask,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('No Photo'),
+                style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.success)),
+                onPressed: onStartTaskNoPhoto,
+              ),
+            ),
+          ],
         ),
         // Resume a previous task
         if (provider.todayTasks.isNotEmpty) ...[

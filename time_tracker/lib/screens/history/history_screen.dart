@@ -3,9 +3,12 @@ import '../../database/dao/work_day_dao.dart';
 import '../../database/dao/task_dao.dart';
 import '../../models/work_day.dart';
 import '../../models/task.dart';
+import '../../models/session.dart';
 import '../../utils/time_utils.dart';
+import '../../utils/prefs_utils.dart';
 import 'past_day_entry_screen.dart';
 import '../../database/dao/session_dao.dart';
+import '../summary/summary_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -18,6 +21,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<WorkDay> _days = [];
   Map<int, int> _taskMinutesByDay = {};
   Map<int, List<Task>> _tasksByDay = {};
+  Map<int, List<Session>> _sessionsByDay = {};
   bool _loading = true;
 
   @override
@@ -30,23 +34,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final days = await WorkDayDao().getAll();
     final Map<int, List<Task>> taskMap = {};
     final Map<int, int> minutesMap = {};
+    final Map<int, List<Session>> sessionsMap = {};
 
     for (final day in days) {
       if (day.id != null) {
         final tasks = await TaskDao().getByWorkDay(day.id!);
         taskMap[day.id!] = tasks;
         final daySessions = await SessionDao().getByWorkDay(day.id!);
+        sessionsMap[day.id!] = daySessions;
         minutesMap[day.id!] = daySessions
-            .where((s) => !s.isActive)
-            .fold<int>(0, (sum, s) => sum + s.durationMinutes);
+            .where((s) => s.clockOutTime != null)
+            .fold<int>(0, (sum, s) {
+              final raw = s.clockOutTime!.difference(s.clockInTime);
+              return sum + TimeUtils.roundToNearest15(raw).inMinutes;
+            });
       }
     }
+    if (!mounted) return;
     setState(() {
       _days = days;
       _tasksByDay = taskMap;
       _taskMinutesByDay = minutesMap;
+      _sessionsByDay = sessionsMap;
       _loading = false;
     });
+  }
+
+  Future<void> _navigateToDay(WorkDay day) async {
+    final workerName = await PrefsUtils.getWorkerName();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SummaryScreen(day: day, workerName: workerName),
+      ),
+    );
+    if (mounted) _load();
   }
 
   // Group days by month label e.g. "June 2026"
@@ -89,39 +112,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : _days.isEmpty
               ? _EmptyState()
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    // Monthly totals banner
-                    _MonthlyBanner(
-                      days: _days,
-                      tasksByDay: _tasksByDay,
-                      taskMinutesByDay: _taskMinutesByDay,
-                    ),
-                    const SizedBox(height: 20),
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // Monthly totals banner
+                      _MonthlyBanner(
+                        days: _days,
+                        tasksByDay: _tasksByDay,
+                        taskMinutesByDay: _taskMinutesByDay,
+                      ),
+                      const SizedBox(height: 20),
 
-                    // Days grouped by month
-                    ..._grouped.entries.map((entry) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Text(entry.key,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge),
-                        ),
-                        ...entry.value.map((day) => _DayCard(
-                          day: day,
-                          tasks: _tasksByDay[day.id] ?? [],
-                          totalMinutes: _taskMinutesByDay[day.id] ?? 0,
-                          onRefresh: _load,
-                          onTap: () async { /* ... unchanged */ },
-                        )),
-                        const SizedBox(height: 8),
-                      ],
-                    )),
-                  ],
+                      // Days grouped by month
+                      ..._grouped.entries.map((entry) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(entry.key,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelLarge),
+                          ),
+                          ...entry.value.map((day) => _DayCard(
+                            day: day,
+                            tasks: _tasksByDay[day.id] ?? [],
+                            totalMinutes: _taskMinutesByDay[day.id] ?? 0,
+                            sessions: _sessionsByDay[day.id] ?? [],
+                            onRefresh: _load,
+                            onTap: () => _navigateToDay(day),
+                          )),
+                          const SizedBox(height: 8),
+                        ],
+                      )),
+                    ],
+                  ),
                 ),
     );
   }
@@ -228,6 +256,7 @@ class _DayCard extends StatelessWidget {
   final WorkDay day;
   final List<Task> tasks;
   final int totalMinutes;
+  final List<Session> sessions;
   final VoidCallback onTap;
   final VoidCallback onRefresh;
 
@@ -235,14 +264,25 @@ class _DayCard extends StatelessWidget {
     required this.day,
     required this.tasks,
     required this.totalMinutes,
+    required this.sessions,
     required this.onTap,
     required this.onRefresh,
   });
 
+  String _timeLabel() {
+    if (sessions.isEmpty) return 'No sessions recorded';
+    final firstIn = sessions.first.clockInTime;
+    final last = sessions.last;
+    if (last.isActive) {
+      return 'Clocked in ${TimeUtils.formatTime(firstIn)}';
+    }
+    return '${TimeUtils.formatTime(firstIn)} → ${TimeUtils.formatTime(last.clockOutTime!)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final completed = tasks.toList();
-    final isComplete = day.isComplete;
+    final isComplete = sessions.isNotEmpty && sessions.every((s) => !s.isActive);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -301,11 +341,7 @@ class _DayCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isComplete
-                          ? '${TimeUtils.formatTime(day.clockInTime!)} → ${TimeUtils.formatTime(day.clockOutTime!)}'
-                          : day.clockInTime != null
-                              ? 'Clocked in ${TimeUtils.formatTime(day.clockInTime!)}'
-                              : 'No clock in',
+                      _timeLabel(),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     if (completed.isNotEmpty) ...[

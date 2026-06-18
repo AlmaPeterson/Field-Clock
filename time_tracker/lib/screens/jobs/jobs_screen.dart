@@ -231,8 +231,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         taskMap[day.id!] = tasks;
         final daySessions = await SessionDao().getByWorkDay(day.id!);
         minutesMap[day.id!] = daySessions
-            .where((s) => !s.isActive)
-            .fold<int>(0, (sum, s) => sum + s.durationMinutes);
+            .where((s) => s.clockOutTime != null)
+            .fold<int>(0, (sum, s) {
+              final raw = s.clockOutTime!.difference(s.clockInTime);
+              return sum + TimeUtils.roundToNearest15(raw).inMinutes;
+            });
       }
     }
     setState(() {

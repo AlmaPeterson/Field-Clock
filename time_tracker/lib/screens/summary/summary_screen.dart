@@ -12,6 +12,7 @@ import '../history/edit_day_screen.dart';
 import '../../database/database_helper.dart';
 import '../../models/task_session.dart';
 import '../../database/dao/task_session_dao.dart';
+import '../../utils/prefs_utils.dart';
 
 class SummaryScreen extends StatefulWidget {
   final WorkDay day;
@@ -32,6 +33,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
   List<Session> _sessions = [];
   List<Task> _tasks = [];
   bool _loading = true;
+  bool _showEarnings = false;
+  double _hourlyRate = 0.0;
 
   @override
   void initState() {
@@ -45,6 +48,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
         await TaskDao().getByWorkDay(widget.day.id!);
     final sessions =
         await SessionDao().getByWorkDay(widget.day.id!);
+    final showEarnings = await PrefsUtils.getShowEarnings();
+    final hourlyRate = await PrefsUtils.getHourlyRate();
 
     // Load task sessions for total calc
     final Map<int, List<TaskSession>> tsMap = {};
@@ -59,13 +64,18 @@ class _SummaryScreenState extends State<SummaryScreen> {
       _tasks = tasks;
       _sessions = sessions;
       _taskSessionsMap = tsMap;
+      _showEarnings = showEarnings;
+      _hourlyRate = hourlyRate;
       _loading = false;
     });
   }
 
   int get _totalMinutes => _sessions
-    .where((s) => !s.isActive)
-    .fold<int>(0, (sum, s) => sum + s.durationMinutes);
+    .where((s) => s.clockOutTime != null)
+    .fold<int>(0, (sum, s) {
+      final raw = s.clockOutTime!.difference(s.clockInTime);
+      return sum + TimeUtils.roundToNearest15(raw).inMinutes;
+    });
 
   void _showShareSheet() {
     showModalBottomSheet(
@@ -90,38 +100,16 @@ class _SummaryScreenState extends State<SummaryScreen> {
             const SizedBox(height: 20),
 
             _ShareOption(
-              icon: Icons.short_text,
-              label: 'Condensed Text',
-              sublabel:
-                  'Task names + totals only, no details',
-              onTap: () {
-                Navigator.pop(context);
-                ShareUtils.shareText(
-                  day: widget.day,
-                  tasks: _tasks,
-                  sessions: _sessions,
-                  workerName: widget.workerName,
-                  taskSessions: _taskSessionsMap,
-                  condensed: true,
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-
-            _ShareOption(
               icon: Icons.article_outlined,
-              label: 'Full Text',
-              sublabel:
-                  'All sessions, times, notes, locations',
+              label: 'Share Text',
+              sublabel: 'Plain text summary',
               onTap: () {
                 Navigator.pop(context);
                 ShareUtils.shareText(
                   day: widget.day,
                   tasks: _tasks,
                   sessions: _sessions,
-                  workerName: widget.workerName,
                   taskSessions: _taskSessionsMap,
-                  condensed: false,
                 );
               },
             ),
@@ -129,37 +117,32 @@ class _SummaryScreenState extends State<SummaryScreen> {
 
             _ShareOption(
               icon: Icons.picture_as_pdf_outlined,
-              label: 'PDF — Condensed',
-              sublabel:
-                  'Clean one-pager, easy to approve',
+              label: 'Share PDF',
+              sublabel: 'Clean one-pager, easy to approve',
               onTap: () {
                 Navigator.pop(context);
                 ShareUtils.sharePdf(
                   day: widget.day,
                   tasks: _tasks,
                   sessions: _sessions,
-                  workerName: widget.workerName,
                   taskSessions: _taskSessionsMap,
-                  condensed: true,
                 );
               },
             ),
             const SizedBox(height: 10),
 
             _ShareOption(
-              icon: Icons.picture_as_pdf,
-              label: 'PDF — Full',
-              sublabel:
-                  'All sessions, photos, notes',
+              icon: Icons.photo_library_outlined,
+              label: 'Share with Photos',
+              sublabel: 'Text summary + all task photos attached',
               onTap: () {
                 Navigator.pop(context);
-                ShareUtils.sharePdf(
+                ShareUtils.shareWithPhotos(
                   day: widget.day,
                   tasks: _tasks,
                   sessions: _sessions,
-                  workerName: widget.workerName,
                   taskSessions: _taskSessionsMap,
-                  condensed: false,
+                  context: context,
                 );
               },
             ),
@@ -218,7 +201,10 @@ class _SummaryScreenState extends State<SummaryScreen> {
       body: _loading
           ? Center(
               child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
-          : ListView(
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 // Date header
@@ -234,6 +220,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   totalMinutes: _totalMinutes,
                   sessions: _sessions,
                   taskCount: _tasks.length,
+                  showEarnings: _showEarnings,
+                  hourlyRate: _hourlyRate,
                 ),
                 const SizedBox(height: 16),
 
@@ -262,6 +250,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 const SizedBox(height: 32),
               ],
             ),
+          ),
     );
   }
 
@@ -320,12 +309,16 @@ class _DayOverviewCard extends StatelessWidget {
   final int totalMinutes;
   final List<Session> sessions;
   final int taskCount;
+  final bool showEarnings;
+  final double hourlyRate;
 
   const _DayOverviewCard({
     required this.day,
     required this.totalMinutes,
     required this.sessions,
     required this.taskCount,
+    this.showEarnings = false,
+    this.hourlyRate = 0.0,
   });
 
   @override
@@ -353,6 +346,12 @@ class _DayOverviewCard extends StatelessWidget {
                   label: 'TASKS',
                   value: '$taskCount',
                 ),
+                if (showEarnings)
+                  _StatBlock(
+                    label: 'EARNINGS',
+                    value:
+                        '\$${TimeUtils.calculateEarnings(Duration(minutes: totalMinutes), hourlyRate).toStringAsFixed(2)}',
+                  ),
               ],
             ),
             if (sessions.isNotEmpty) ...[

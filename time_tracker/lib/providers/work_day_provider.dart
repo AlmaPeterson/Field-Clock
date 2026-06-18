@@ -39,8 +39,11 @@ class WorkDayProvider extends ChangeNotifier {
       _activeTaskSession != null;
 
   int get totalSessionMinutes => _todaySessions
-      .where((s) => !s.isActive)
-      .fold(0, (sum, s) => sum + s.durationMinutes);
+      .where((s) => s.clockOutTime != null)
+      .fold<int>(0, (sum, s) {
+        final raw = s.clockOutTime!.difference(s.clockInTime);
+        return sum + TimeUtils.roundToNearest15(raw).inMinutes;
+      });
 
   Future<void> loadToday() async {
     _today = await _workDayDao.getToday();
@@ -189,8 +192,11 @@ class WorkDayProvider extends ChangeNotifier {
   Future<void> _updateWorkDayTotals() async {
     if (_today == null) return;
     final completedMinutes = _todaySessions
-        .where((s) => !s.isActive)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where((s) => s.clockOutTime != null)
+        .fold<int>(0, (sum, s) {
+          final raw = s.clockOutTime!.difference(s.clockInTime);
+          return sum + TimeUtils.roundToNearest15(raw).inMinutes;
+        });
     final updated = _today!.copyWith(
       totalMinutesRaw: completedMinutes,
       totalMinutesRounded: completedMinutes,
